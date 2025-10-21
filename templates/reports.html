@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div class="container">
+        <h1 class="mb-4">🧠 Analiz Motorları</h1>
+
+        <div class="row">
+            
+            <div class="col-md-6">
+                
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">🧮 Motor 1: Hedef Marj Hesaplayıcı</div>
+                    <div class="card-body">
+                        <p>Bir ürünün maliyetine göre, istediğiniz kar marjı için gereken satış fiyatını hesaplar.</p>
+                        <form action="{{ url_for('reports') }}" method="POST">
+                            <input type="hidden" name="analiz_tipi" value="hedef_marj">
+                            <div class="mb-3">
+                                <label for="urun_marj" class="form-label">Ürün Seçin:</label>
+                                <select class="form-select" name="urun_ismi" id="urun_marj" required>
+                                    {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="hedef_marj" class="form-label">Hedef Kar Marjı (%):</label>
+                                <input type="number" class="form-control" name="hedef_marj" id="hedef_marj" value="70" step="1" min="1" max="99" required>
+                            </div>
+                            <button type="submit" class="btn btn-info">Hesapla (Hücre 9)</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-warning">📈 Motor 2: Fiyat Simülatörü</div>
+                    <div class="card-body">
+                        <p>"Ya... olursa?" analizi. Bir ürünün fiyatını değiştirirseniz tahmini karınızın ne olacağını söyler.</p>
+                        <form action="{{ url_for('reports') }}" method="POST">
+                            <input type="hidden" name="analiz_tipi" value="simulasyon">
+                            <div class="mb-3">
+                                <label for="urun_sim" class="form-label">Ürün Seçin:</label>
+                                <select class="form-select" name="urun_ismi" id="urun_sim" required>
+                                    {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="yeni_fiyat" class="form-label">Yeni Satış Fiyatı (TL):</label>
+                                <input type="number" class="form-control" name="yeni_fiyat" id="yeni_fiyat" value="300" step="1" min="1" required>
+                            </div>
+                            <button type="submit" class="btn btn-warning">Simüle Et (Hücre 7)</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">🏆 Motor 3: Optimum Fiyat Motoru</div>
+                    <div class="card-body">
+                        <p>Bir ürün için "Maksimum Kar" getirecek optimum fiyatı, geçmiş verilere göre tahmin eder.</p>
+                        <form action="{{ url_for('reports') }}" method="POST">
+                            <input type="hidden" name="analiz_tipi" value="optimum_fiyat">
+                            <div class="mb-3">
+                                <label for="urun_opt" class="form-label">Ürün Seçin:</label>
+                                <select class="form-select" name="urun_ismi" id="urun_opt" required>
+                                    {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Optimum Fiyatı Bul (Hücre 8)</button>
+                        </form>
+                    </div>
+                </div>
+                
+            </div> <div class="col-md-6">
+
+                <div class="card mb-4">
+                    <div class="card-header bg-danger text-white">🎯 Motor 4: Stratejist Asistan (Kategori)</div>
+                    <div class="card-body">
+                        <p>Kategori içi yamyamlığı (cannibalization) tespit eder. (Örn: Cheeseburger vs Steak Burger)</p>
+                        <form action="{{ url_for('reports') }}" method="POST">
+                            <input type="hidden" name="analiz_tipi" value="kategori">
+                            <div class="mb-3">
+                                <label for="kategori_isim" class="form-label">Kategori Seçin:</label>
+                                <select class="form-select" name="kategori_ismi" id="kategori_isim" required>
+                                    {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="gun_kat" class="form-label">Karşılaştırma Periyodu (Gün):</label>
+                                <input type="number" class="form-control" name="gun_sayisi" id="gun_kat" value="7" step="1" min="1" required>
+                            </div>
+                            <button type="submit" class="btn btn-danger">Analiz Et (Hücre 10)</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">👑 Motor 5: Genel Stratejist (Grup)</div>
+                    <div class="card-body">
+                        <p>Çapraz kategori yamyamlığını tespit eder. (Örn: Burgerler vs Et Yemekleri). En rasyonel analizdir.</p>
+                        <form action="{{ url_for('reports') }}" method="POST">
+                            <input type="hidden" name="analiz_tipi" value="grup">
+                            <div class="mb-3">
+                                <label for="grup_isim" class="form-label">Kategori Grubu Seçin:</label>
+                                <select class="form-select" name="grup_ismi" id="grup_isim" required>
+                                    {% for grup in grup_listesi %}<option value="{{ grup }}">{{ grup }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="gun_grup" class="form-label">Karşılaştırma Periyodu (Gün):</label>
+                                <input type="number" class="form-control" name="gun_sayisi" id="gun_grup" value="7" step="1" min="1" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Analiz Et (Hücre 11)</button>
+                        </form>
+                    </div>
+                </div>
+
+            </div> </div> <hr>
+
+        <h2 class="mb-3">Analiz Sonucu</h2>
+        
+        {% if analiz_sonucu %}
+            <pre>{{ analiz_sonucu }}</pre>
+        {% else %}
+            <div class="alert alert-secondary" role="alert">
+                Lütfen yukarıdaki motorlardan birini çalıştırın. Rapor sonucu burada görünecektir.
+            </div>
+        {% endif %}
+
+    </div>
+
+{% endblock %}
