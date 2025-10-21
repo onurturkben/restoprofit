@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div class="container">
+        <h1 class="mb-4">⚙️ Menü & Maliyet Yönetimi</h1>
+        
+        <div class="alert alert-warning" role="alert">
+            <strong>Dikkat:</strong> Bu panel, Colab'deki "Hücre 3"ün yerini alır. Aşağıdaki "Menü Verilerini Sıfırla" butonu, `app.py` dosyası içindeki gömülü (hard-coded) listeyi kullanarak tüm hammaddeleri, ürünleri ve reçeteleri <strong>sıfırlar ve yeniden oluşturur.</strong>
+            <br><br>
+            <strong>Bu işlem geçmiş satış kayıtlarınızı (SatisKayitlari) SİLMEZ.</strong> Maliyetleri veya reçeteleri güncellemek için `app.py` dosyasındaki `reset_menu_data` fonksiyonunun içini düzenleyip bu butona basmanız gerekir.
+        </div>
+
+        <div class="mb-4">
+            <form action="{{ url_for('reset_menu_data') }}" method="POST" onsubmit="return confirm('Tüm Hammadde, Ürün ve Reçete verileriniz silinecek ve app.py\'deki verilerle yeniden yüklenecek. Emin misiniz? (Satış geçmişiniz korunacak.)');">
+                <button type="submit" class="btn btn-danger btn-lg">
+                    🔥 Menü Verilerini Sıfırla ve Yeniden Kur
+                </button>
+            </form>
+        </div>
+
+        <hr>
+
+        <div class="row">
+            <div class="col-md-12">
+                <h2>Ürünler ({{ urunler|length }} adet)</h2>
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>İsim</th>
+                            <th>Excel Adı</th>
+                            <th>Fiyat</th>
+                            <th>Maliyet (Hesaplanan)</th>
+                            <th>Kategori</th>
+                            <th>Grup</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for urun in urunler %}
+                        <tr>
+                            <td><strong>{{ urun.isim }}</strong></td>
+                            <td>{{ urun.excel_adi }}</td>
+                            <td>{{ "%.2f"|format(urun.mevcut_satis_fiyati) }} TL</td>
+                            <td>{{ "%.2f"|format(urun.hesaplanan_maliyet) }} TL</td>
+                            <td>{{ urun.kategori }}</td>
+                            <td>{{ urun.kategori_grubu }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h2>Hammaddeler ({{ hammaddeler|length }} adet)</h2>
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>İsim</th>
+                            <th>Birim</th>
+                            <th>Fiyat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hammadde in hammaddeler %}
+                        <tr>
+                            <td>{{ hammadde.isim }}</td>
+                            <td>{{ hammadde.maliyet_birimi }}</td>
+                            <td>{{ "%.2f"|format(hammadde.maliyet_fiyati) }} TL</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="col-md-6">
+                <h2>Reçeteler ({{ receteler|length }} adet)</h2>
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ürün</th>
+                            <th>Hammadde</th>
+                            <th>Miktar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for recete in receteler %}
+                        <tr>
+                            <td>{{ recete.urun.isim }}</td>
+                            <td>{{ recete.hammadde.isim }}</td>
+                            <td>{{ recete.miktar }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </div>
+
+{% endblock %}
