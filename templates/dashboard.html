@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div class="container">
+        <h1 class="mb-4">📊 Ana Ekran & Rapor Yükleme</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Toplam Ürün</h5>
+                        <p class="card-text fs-3">{{ summary.toplam_urun }} adet</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card text-white bg-success mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Toplam Satış Kaydı</h5>
+                        <p class="card-text fs-3">{{ summary.toplam_satis_kaydi }} adet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                Yeni Satış Raporu Yükle (Excel)
+            </div>
+            <div class="card-body">
+                <p class="card-text">Lütfen Adisyon sisteminizden aldığınız `.xlsx` formatındaki satış raporunu seçin.</p>
+                <p class="text-muted small">Kolonlar: 'Urun_Adi', 'Adet', 'Toplam_Tutar', 'Tarih'</p>
+                
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="input-group">
+                        <input type="file" class="form-control" name="excel_file" id="excel_file" accept=".xlsx" required>
+                        <button class="btn btn-success" type="submit">
+                            🚀 Yükle ve İşle
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+    </div>
+
+{% endblock %}
