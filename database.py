@@ -1,8 +1,8 @@
+# database.py (Düzeltilmiş - Render PostgreSQL için)
 import os
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.sql import func
 from flask_login import UserMixin
-import base64 # Logo için base64 encode/decode işlemleri için eklendi
 
 db = SQLAlchemy()
 
@@ -14,6 +14,8 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 class Hammadde(db.Model):
     """Hammadde modeli"""
@@ -23,9 +25,8 @@ class Hammadde(db.Model):
     maliyet_birimi = db.Column(db.String(20)) # kg, litre, adet vb.
     maliyet_fiyati = db.Column(db.Float, nullable=False)
     guncellenme_tarihi = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    
     # Bir hammadde birden fazla reçetede olabilir
-    receteler = db.relationship('Recete', back_populates='hammadde', lazy='dynamic')
+    receteler = db.relationship('Recete', back_populates='hammadde', lazy='dynamic') # cascade eklendi
 
 class Urun(db.Model):
     """Satılan ürün (Menü kalemi) modeli"""
@@ -39,6 +40,7 @@ class Urun(db.Model):
     kategori_grubu = db.Column(db.String(100)) # Örn: Yiyecekler, İçecekler
     
     # İlişkiler
+    # Ürün silindiğinde ilişkili reçete ve satış kayıtları da silinsin
     receteler = db.relationship('Recete', back_populates='urun', cascade="all, delete-orphan")
     satislar = db.relationship('SatisKaydi', back_populates='urun', cascade="all, delete-orphan")
 
@@ -68,27 +70,26 @@ class SatisKaydi(db.Model):
     
     urun = db.relationship('Urun', back_populates='satislar')
 
-class Ayarlar(db.Model):
-    """Site ayarlarını (logo, site adı vb.) tutmak için model."""
-    __tablename__ = 'ayarlar'
-    id = db.Column(db.Integer, primary_key=True)
-    site_adi = db.Column(db.String(100), default='RestoProfit')
-    logo_data = db.Column(db.Text, nullable=True) # Logo'yu Base64 string olarak saklayacağız
-    logo_mimetype = db.Column(db.String(50), nullable=True) # Örn: 'image/png'
-
 # --- YARDIMCI FONKSİYONLAR ---
 
 def init_db(app):
     """ Veritabanını Flask uygulamasına bağlar ve tabloları oluşturur. """
-    # Render.com'un sağladığı veritabanı URL'sini kullanır, bulamazsa lokal sqlite dosyası oluşturur.
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL_SQLALCHEMY', 'sqlite:///instance/app.db')
+    # Render PostgreSQL URL'sini kullan, yoksa lokal SQLite kullan
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith("postgres://"):
+        # Render PostgreSQL URL'sini SQLAlchemy uyumlu hale getir
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    else:
+        # Lokal geliştirme için SQLite fallback
+        # 'instance' klasörü otomatik oluşturulur, oraya kaydedelim
+        instance_path = os.path.join(app.instance_path)
+        if not os.path.exists(instance_path):
+            os.makedirs(instance_path)
+        database_url = f'sqlite:///{os.path.join(instance_path, "restoran.db")}'
+        print(f"UYARI: DATABASE_URL bulunamadı, lokal SQLite kullanılıyor: {database_url}")
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    # Veritabanı dosyasının bulunacağı klasörün var olduğundan emin ol
-    if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
-        db_dir = os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
-        if not os.path.exists(db_dir):
-            os.makedirs(db_dir)
             
     db.init_app(app)
     
@@ -106,12 +107,14 @@ def guncelle_tum_urun_maliyetleri():
         urunler = Urun.query.all()
         for urun in urunler:
             toplam_maliyet = 0.0
-            receteler = Recete.query.filter_by(urun_id=urun.id).all()
-            for recete_kalemi in receteler:
+            # İlişkili reçeteleri doğrudan urun.receteler üzerinden alalım
+            for recete_kalemi in urun.receteler: 
                 if recete_kalemi.hammadde:
                     toplam_maliyet += recete_kalemi.miktar * recete_kalemi.hammadde.maliyet_fiyati
-            urun.hesaplanan_maliyet = round(toplam_maliyet, 2)
+            urun.hesaplanan_maliyet = round(toplam_maliyet, 2) # Yuvarlama ekleyelim
         db.session.commit()
+        # flash mesajı app.py içinde verilecek, burada sadece print kalsın
+        print("Tüm ürün maliyetleri yeniden hesaplandı.") 
         return True, "Tüm ürün maliyetleri başarıyla güncellendi."
     except Exception as e:
         db.session.rollback()
