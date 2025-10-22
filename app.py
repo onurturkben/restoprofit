@@ -1,9 +1,8 @@
-# app.py (Son Sürüm: CRUD, Veri Yönetimi, Şifre Değiştirme, Logo Yönetimi)
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash
 from database import (
     db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
-    guncelle_tum_urun_maliyetleri, Ayarlar
+    guncelle_tum_urun_maliyetleri
 )
 import pandas as pd
 from datetime import datetime
@@ -13,8 +12,6 @@ from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 from sqlalchemy import func
-from werkzeug.utils import secure_filename
-import base64
 
 # --- Analiz Motorlarını "Beyinden" İçe Aktar ---
 from analysis_engine import (
@@ -27,13 +24,6 @@ from analysis_engine import (
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'renderda_bunu_kesin_degistirmelisiniz123')
-app.config['UPLOAD_FOLDER'] = 'static/uploads' # Logo için yükleme klasörü
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1 MB limit
-
-# Klasörün varlığını kontrol et
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
-
 init_db(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
@@ -45,29 +35,16 @@ login_manager.login_message_category = "warning"
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- İLK KULLANICIYI VE AYARLARI OLUŞTUR ---
+# --- İLK KULLANICIYI OLUŞTUR ---
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
+        # Lütfen bu şifreyi ilk girişten sonra hemen değiştirin!
         hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
         admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
         db.session.commit()
         print("Güvenli kullanıcı oluşturuldu.")
-    if not Ayarlar.query.first():
-        print("Varsayılan ayarlar oluşturuluyor...")
-        default_settings = Ayarlar(site_adı="RestoProfit")
-        db.session.add(default_settings)
-        db.session.commit()
-        print("Ayarlar oluşturuldu.")
-
-# --- CONTEXT PROCESSOR ---
-# Tüm templatelerde ayarları kullanılabilir yap
-@app.context_processor
-def inject_settings():
-    settings = Ayarlar.query.first()
-    return dict(settings=settings)
-
 
 # --- GÜVENLİK SAYFALARI ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -91,6 +68,41 @@ def logout():
     logout_user()
     flash('Başarıyla çıkış yaptınız.', 'info')
     return redirect(url_for('login'))
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
+            flash('Mevcut şifreniz hatalı.', 'danger')
+            return redirect(url_for('change_password'))
+            
+        if new_password != confirm_password:
+            flash('Yeni şifreler birbiriyle eşleşmiyor.', 'danger')
+            return redirect(url_for('change_password'))
+            
+        if len(new_password) < 6:
+            flash('Yeni şifreniz en az 6 karakter olmalıdır.', 'danger')
+            return redirect(url_for('change_password'))
+
+        try:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            current_user.password_hash = hashed_password
+            db.session.commit()
+            flash('Şifreniz başarıyla güncellendi. Lütfen yeni şifrenizle tekrar giriş yapın.', 'success')
+            return redirect(url_for('logout')) 
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Şifre güncellenirken bir hata oluştu: {e}", 'danger')
+            return redirect(url_for('change_password'))
+            
+    return render_template('change_password.html', title='Şifre Değiştir')
+
 
 # --- ANA SAYFA ---
 @app.route('/')
@@ -196,7 +208,6 @@ def admin_panel():
                            urunler=urunler, 
                            receteler=receteler)
 
-# --- HAMMADDE CRUD ---
 @app.route('/add-material', methods=['POST'])
 @login_required
 def add_material():
@@ -209,54 +220,17 @@ def add_material():
         db.session.add(yeni_hammadde)
         db.session.commit()
         flash(f"Başarılı! '{isim}' hammaddesi eklendi.", 'success')
+    
     except IntegrityError: 
         db.session.rollback()
         flash(f"HATA: '{isim}' adında bir hammadde zaten mevcut.", 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Hammadde eklenirken bir hata oluştu: {e}", 'danger')
-    return redirect(url_for('admin_panel'))
-
-@app.route('/edit-material/<int:id>', methods=['POST'])
-@login_required
-def edit_material(id):
-    try:
-        hammadde = db.session.get(Hammadde, id)
-        if not hammadde:
-            flash('Hammadde bulunamadı.', 'danger')
-            return redirect(url_for('admin_panel'))
         
-        hammadde.isim = request.form.get('isim')
-        hammadde.maliyet_birimi = request.form.get('birim')
-        hammadde.maliyet_fiyati = float(request.form.get('fiyat'))
-        db.session.commit()
-        guncelle_tum_urun_maliyetleri()
-        flash(f"'{hammadde.isim}' güncellendi.", 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f"HATA: Güncelleme sırasında bir hata oluştu: {e}", 'danger')
     return redirect(url_for('admin_panel'))
 
-@app.route('/delete-material/<int:id>', methods=['POST'])
-@login_required
-def delete_material(id):
-    try:
-        hammadde = db.session.get(Hammadde, id)
-        if hammadde:
-            if hammadde.receteler:
-                flash(f"HATA: '{hammadde.isim}' bir veya daha fazla reçetede kullanıldığı için silinemez.", 'danger')
-                return redirect(url_for('admin_panel'))
-            db.session.delete(hammadde)
-            db.session.commit()
-            flash(f"'{hammadde.isim}' silindi.", 'success')
-        else:
-            flash("Hammadde bulunamadı.", 'warning')
-    except Exception as e:
-        db.session.rollback()
-        flash(f"HATA: {e}", 'danger')
-    return redirect(url_for('admin_panel'))
 
-# --- ÜRÜN CRUD ---
 @app.route('/add-product', methods=['POST'])
 @login_required
 def add_product():
@@ -277,52 +251,16 @@ def add_product():
         db.session.add(yeni_urun)
         db.session.commit()
         flash(f"Başarılı! '{isim}' ürünü eklendi. Şimdi reçetesini oluşturun.", 'success')
+    
     except IntegrityError:
         db.session.rollback()
         flash(f"HATA: '{isim}' adında bir ürün zaten mevcut.", 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Ürün eklenirken bir hata oluştu: {e}", 'danger')
-    return redirect(url_for('admin_panel'))
-    
-@app.route('/edit-product/<int:id>', methods=['POST'])
-@login_required
-def edit_product(id):
-    try:
-        urun = db.session.get(Urun, id)
-        if not urun:
-            flash('Ürün bulunamadı.', 'danger')
-            return redirect(url_for('admin_panel'))
-            
-        urun.isim = request.form.get('isim')
-        urun.excel_adi = request.form.get('excel_adi')
-        urun.mevcut_satis_fiyati = float(request.form.get('fiyat'))
-        urun.kategori = request.form.get('kategori')
-        urun.kategori_grubu = request.form.get('grup')
-        db.session.commit()
-        flash(f"'{urun.isim}' güncellendi.", 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f"HATA: Güncelleme sırasında bir hata oluştu: {e}", 'danger')
+        
     return redirect(url_for('admin_panel'))
 
-@app.route('/delete-product/<int:id>', methods=['POST'])
-@login_required
-def delete_product(id):
-    try:
-        urun = db.session.get(Urun, id)
-        if urun:
-            db.session.delete(urun)
-            db.session.commit()
-            flash(f"'{urun.isim}' ürünü ve ilgili reçeteleri/satış kayıtları silindi.", 'success')
-        else:
-            flash("Ürün bulunamadı.", 'warning')
-    except Exception as e:
-        db.session.rollback()
-        flash(f"HATA: Ürün silinirken bir hata oluştu: {e}", 'danger')
-    return redirect(url_for('admin_panel'))
-
-# --- REÇETE CRUD ---
 @app.route('/add-recipe', methods=['POST'])
 @login_required
 def add_recipe():
@@ -342,27 +280,13 @@ def add_recipe():
         
         db.session.commit()
         guncelle_tum_urun_maliyetleri()
+        
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Reçete eklenirken bir hata oluştu: {e}", 'danger')
+        
     return redirect(url_for('admin_panel'))
 
-@app.route('/delete-recipe/<int:id>', methods=['POST'])
-@login_required
-def delete_recipe(id):
-    try:
-        recete_item = db.session.get(Recete, id)
-        if recete_item:
-            db.session.delete(recete_item)
-            db.session.commit()
-            guncelle_tum_urun_maliyetleri()
-            flash("Reçete kalemi silindi.", 'success')
-        else:
-            flash("Reçete kalemi bulunamadı.", 'warning')
-    except Exception as e:
-        db.session.rollback()
-        flash(f"HATA: Reçete kalemi silinirken bir hata oluştu: {e}", 'danger')
-    return redirect(url_for('admin_panel'))
 
 # --- VERİ YÖNETİMİ ---
 @app.route('/delete-sales-by-date', methods=['POST'])
@@ -429,6 +353,7 @@ def change_password():
             return redirect(url_for('change_password'))
             
     return render_template('change_password.html', title='Şifre Değiştir')
+
 
 # --- ANALİZ RAPORLARI SAYFASI ---
 @app.route('/reports', methods=['GET', 'POST'])
