@@ -48,8 +48,8 @@ def load_user(user_id):
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
-        hashed_password = bcrypt.generate_password_hash("12345").decode('utf-8')
-        admin_user = User(username="admin", password_hash=hashed_password)
+        hashed_password = bcrypt.generate_password_hash("1234").decode('utf-8')
+        admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
         db.session.commit()
         print("Kullanıcı 'admin', şifre '12345' olarak oluşturuldu.")
