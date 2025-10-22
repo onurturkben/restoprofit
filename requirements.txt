@@ -6,3 +6,5 @@ gunicorn
 psycopg2-binary
 SQLAlchemy
 Flask-SQLAlchemy
+Flask-Login
+Flask-Bcrypt
