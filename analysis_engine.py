@@ -133,7 +133,7 @@ def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
             return False, f"Simülasyon hatası: {e}"
 
 
-# --- Motor 3 (Colab Hücre 8): Optimum Fiyat Motoru ---
+# --- Motor 3: Optimum Fiyat Motoru ---
 
 def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
     with warnings.catch_warnings():
@@ -212,7 +212,7 @@ def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
             return False, f"Optimizasyon hatası: {e}"
 
 
-# --- Motor 4 & 5 (Colab Hücre 10 & 11): Kategori ve Grup Analizi ---
+# --- Motor 4 & 5 (Colab Hücre 10 & 11) - BİRLEŞTİRİLMİŞ ---
 
 def _get_sales_by_filter(field, value):
     """Yardımcı fonksiyon: Kategori veya Gruba göre satışları çeker."""
@@ -227,7 +227,6 @@ def _get_sales_by_filter(field, value):
     if not satislar:
         return None
 
-    # İlişkili verileri çekmek için optimize edilmiş sorgu
     df_data = []
     for s in satislar:
         df_data.append({
@@ -258,8 +257,7 @@ def _hesapla_kategori_ozeti(df_periyot, grup_kolonu):
 
 def analiz_et_kategori_veya_grup(tip, isim, gun_sayisi=7):
     """
-    Hem Kategori (Hücre 10) hem de Kategori Grubu (Hücre 11) analizini
-    yapabilen birleşik fonksiyon.
+    Hem Kategori hem de Kategori Grubu analizini yapabilen birleşik fonksiyon.
     """
     try:
         if tip == 'kategori':
