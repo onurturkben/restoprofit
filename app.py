@@ -1,3 +1,4 @@
+# app.py (FAZ 5, AŞAMA 4: Şifre Yönetimi ve Hata Düzeltmeleri)
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from database import (
@@ -34,6 +35,7 @@ login_manager.login_message_category = "warning"
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
 
 # --- İLK KULLANICIYI OLUŞTUR ---
 with app.app_context():
@@ -104,7 +106,7 @@ def change_password():
     return render_template('change_password.html', title='Şifre Değiştir')
 
 
-# --- ANA SAYFA ---
+# --- ANA SAYFA (DASHBOARD) ---
 @app.route('/')
 @login_required 
 def dashboard():
@@ -122,7 +124,7 @@ def dashboard():
     return render_template('dashboard.html', title='Ana Ekran', summary=summary)
 
 
-# --- VERİ YÖNETİMİ ---
+# --- EXCEL YÜKLEME ---
 @app.route('/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -190,12 +192,13 @@ def upload_excel():
         
     return redirect(url_for('dashboard'))
 
-# --- YÖNETİM PANELİ (CRUD) ---
 
+# --- YÖNETİM PANELİ (Faz 5: CRUD) ---
 @app.route('/admin')
 @login_required
 def admin_panel():
     try:
+        # Formlardaki açılır menüleri doldurmak için bu listeleri çekiyoruz
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
         receteler = Recete.query.join(Urun).join(Hammadde).order_by(Urun.isim, Hammadde.isim).all()
@@ -318,41 +321,6 @@ def delete_sales_by_date():
         flash(f"HATA: Satış kayıtları silinirken bir hata oluştu: {e}", 'danger')
         
     return redirect(url_for('admin_panel'))
-
-# --- ŞİFRE DEĞİŞTİRME ---
-@app.route('/change-password', methods=['GET', 'POST'])
-@login_required
-def change_password():
-    if request.method == 'POST':
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-        
-        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
-            flash('Mevcut şifreniz hatalı.', 'danger')
-            return redirect(url_for('change_password'))
-            
-        if new_password != confirm_password:
-            flash('Yeni şifreler birbiriyle eşleşmiyor.', 'danger')
-            return redirect(url_for('change_password'))
-            
-        if len(new_password) < 6:
-            flash('Yeni şifreniz en az 6 karakter olmalıdır.', 'danger')
-            return redirect(url_for('change_password'))
-
-        try:
-            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
-            current_user.password_hash = hashed_password
-            db.session.commit()
-            flash('Şifreniz başarıyla güncellendi. Lütfen yeni şifrenizle tekrar giriş yapın.', 'success')
-            return redirect(url_for('logout')) 
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Şifre güncellenirken bir hata oluştu: {e}", 'danger')
-            return redirect(url_for('change_password'))
-            
-    return render_template('change_password.html', title='Şifre Değiştir')
 
 
 # --- ANALİZ RAPORLARI SAYFASI ---
