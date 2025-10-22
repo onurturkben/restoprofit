@@ -185,4 +185,28 @@
         </div>
     </div>
 
-{% endblock %}
+    <hr class="my-5 border-danger"> <section class="mb-5">
+        <h2 class="mb-4 text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Tehlikeli Bölge: Veri Yönetimi</h2>
+        
+        <div class="card border-danger shadow-sm"> <div class="card-body p-4">
+                <h3 class="mb-3">Tarihe Göre Satışları Sil</h3>
+                <p class="text-muted">Yanlışlıkla yüklediğiniz veya duplike olan satış kayıtlarını temizlemek için bu aracı kullanabilirsiniz. <strong>Bu işlem GERİ ALINAMAZ!</strong></p>
+                
+                <form action="{{ url_for('delete_sales_by_date') }}" method="POST" 
+                      onsubmit="return confirm('UYARI! Seçtiğiniz tarihteki TÜM satış kayıtları kalıcı olarak silinecektir. Bu işlem geri alınamaz. Emin misiniz?');">
+                    <div class="row align-items-end">
+                        <div class="col-md-4 mb-3">
+                            <label for="delete_date" class="form-label">Silinecek Tarih:</label>
+                            <input type="date" class="form-control" id="delete_date" name="delete_date" required>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <button type="submit" class="btn btn-danger w-100">
+                                <i class="bi bi-trash-fill"></i> Seçili Tarihteki Satışları KALICI OLARAK SİL
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+    {% endblock %}
