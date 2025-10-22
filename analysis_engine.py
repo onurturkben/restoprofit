@@ -1,7 +1,5 @@
-# analysis_engine.py
+# analysis_engine.py (DÜZELTİLMİŞ VERSİYON 2 - ImportError için)
 # Bu dosya, Colab'de yazdığımız TÜM analiz motorlarını içerir.
-# (Hücre 7, 8, 9, 10, 11)
-# Veritabanıyla konuşmak için 'database.py' dosyalarındaki modelleri kullanır.
 
 import pandas as pd
 import numpy as np
@@ -45,12 +43,18 @@ def hesapla_hedef_marj(urun_ismi, hedef_marj_yuzdesi):
 
 def _get_daily_sales_data(urun_id):
     """Yardımcı fonksiyon: Analiz için günlük satış verisini çeker."""
-    satislar = SatisKaydi.query.filter_by(urun_id=urun_id).all()
+    query = db.session.query(
+        SatisKaydi.tarih, 
+        SatisKaydi.adet, 
+        SatisKaydi.hesaplanan_birim_fiyat
+    ).filter_by(urun_id=urun_id)
+    
+    satislar = query.all()
+    
     if not satislar:
         return None
 
-    df_satislar = pd.DataFrame([(s.tarih, s.adet, s.hesaplanan_birim_fiyat) for s in satislar], 
-                               columns=['tarih', 'adet', 'hesaplanan_birim_fiyat'])
+    df_satislar = pd.DataFrame(satislar, columns=['tarih', 'adet', 'hesaplanan_birim_fiyat'])
     df_satislar['tarih'] = pd.to_datetime(df_satislar['tarih'])
     
     df_gunluk = df_satislar.set_index('tarih').resample('D').agg(
@@ -63,7 +67,7 @@ def _get_daily_sales_data(urun_id):
 
 def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore") # Sklearn uyarılarını gizle
+        warnings.simplefilter("ignore")
         
         try:
             urun = Urun.query.filter_by(isim=urun_ismi).first()
@@ -101,7 +105,7 @@ def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
                 rapor += "UYARI: Model, fiyat arttıkça satışların ARTTIĞINI söylüyor! Veri yetersiz.\n"
 
             tahmini_yeni_satis = model.predict(np.array([[test_edilecek_yeni_fiyat]]))[0]
-            tahmini_yeni_satis = max(0, tahmini_yeni_satis) # Negatif olamaz
+            tahmini_yeni_satis = max(0, tahmini_yeni_satis)
             tahmini_yeni_kar = (test_edilecek_yeni_fiyat - maliyet) * tahmini_yeni_satis
             kar_degisimi = tahmini_yeni_kar - mevcut_gunluk_kar
             
@@ -166,7 +170,7 @@ def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
                 if model:
                     tahmini_adet = model.predict(np.array([[fiyat]]))[0]
                 else:
-                    tahmini_adet = df_gunluk['toplam_adet'].mean() # Model yoksa ortalamayı al
+                    tahmini_adet = df_gunluk['toplam_adet'].mean()
                 
                 tahmini_adet = max(0, tahmini_adet)
                 tahmini_kar = (fiyat - maliyet) * tahmini_adet
@@ -178,9 +182,11 @@ def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
             df_sonuclar = pd.DataFrame(sonuclar)
             optimum = df_sonuclar.loc[df_sonuclar['tahmini_kar'].idxmax()]
             
-            mevcut_gunluk_satis = df_gunluk[df_gunluk['ortalama_fiyat'].round() == round(mevcut_fiyat)]['toplam_adet'].mean()
-            if pd.isna(mevcut_gunluk_satis) or mevcut_gunluk_satis == 0:
-                mevcut_gunluk_satis = df_gunluk['toplam_adet'].mean() # Ortalamayı al
+            mevcut_gunluk_satis_df = df_gunluk[df_gunluk['ortalama_fiyat'].round() == round(mevcut_fiyat)]
+            if not mevcut_gunluk_satis_df.empty:
+                mevcut_gunluk_satis = mevcut_gunluk_satis_df['toplam_adet'].mean()
+            else:
+                mevcut_gunluk_satis = df_gunluk['toplam_adet'].mean()
                 
             mevcut_kar = (mevcut_fiyat - maliyet) * mevcut_gunluk_satis
 
@@ -199,17 +205,18 @@ def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
             return False, f"Optimizasyon hatası: {e}"
 
 
-# --- Motor 4 (Colab Hücre 10): Kategori Analizi ---
+# --- Motor 4 & 5 (Colab Hücre 10 & 11) - BİRLEŞTİRİLDİ ---
 
 def _get_sales_by_filter(field, value):
     """Yardımcı fonksiyon: Kategori veya Gruba göre satışları çeker."""
     if field == 'kategori':
-        satislar = SatisKaydi.query.join(Urun).filter(Urun.kategori == value).all()
+        query = SatisKaydi.query.join(Urun).filter(Urun.kategori == value)
     elif field == 'kategori_grubu':
-        satislar = SatisKaydi.query.join(Urun).filter(Urun.kategori_grubu == value).all()
+        query = SatisKaydi.query.join(Urun).filter(Urun.kategori_grubu == value)
     else:
         return None
         
+    satislar = query.all()
     if not satislar:
         return None
 
@@ -223,11 +230,46 @@ def _get_sales_by_filter(field, value):
         })
     return pd.DataFrame(df_data)
 
-def analiz_et_kategori(kategori_ismi, gun_sayisi=7):
+def _hesapla_kategori_ozeti(df_periyot, grup_kolonu):
+    """Genel yardımcı fonksiyon (Kategori veya Grup için)"""
+    if df_periyot.empty:
+        return {'toplam_kari': 0, 'karlar': {}, 'paylar': {}}
+    
+    toplam_kari = df_periyot['hesaplanan_kar'].sum()
+    if toplam_kari <= 0:
+        return {'toplam_kari': toplam_kari, 'karlar': {}, 'paylar': {}}
+
+    karlar = df_periyot.groupby(grup_kolonu)['hesaplanan_kar'].sum()
+    paylar = (karlar / toplam_kari) * 100
+    
+    return {
+        'toplam_kari': toplam_kari,
+        'karlar': karlar.to_dict(),
+        'paylar': paylar.to_dict()
+    }
+
+# --- HATA BURADAYDI: İki fonksiyonu app.py'nin beklediği tek fonksiyonda birleştirdim ---
+def analiz_et_kategori_veya_grup(tip, isim, gun_sayisi=7):
+    """
+    Hem Kategori (Hücre 10) hem de Kategori Grubu (Hücre 11) analizini
+    yapabilen birleşik fonksiyon. (DÜZELTİLMİŞ)
+    tip: 'kategori' veya 'kategori_grubu'
+    isim: 'Burgerler' veya 'Ana Yemekler'
+    """
     try:
-        df_satislar = _get_sales_by_filter('kategori', kategori_ismi)
+        if tip == 'kategori':
+            df_satislar = _get_sales_by_filter('kategori', isim)
+            grup_kolonu = 'isim' # Kategori analizi, içindeki ÜRÜNLERİN payına bakar
+            baslik = f"STRATEJİST ASİSTAN (FAZ 3): '{isim}' KATEGORİ ANALİZİ"
+        elif tip == 'kategori_grubu':
+            df_satislar = _get_sales_by_filter('kategori_grubu', isim)
+            grup_kolonu = 'kategori' # Grup analizi, içindeki KATEGORİLERİN payına bakar
+            baslik = f"GENEL STRATEJİST (FAZ 4): '{isim}' GRUP ANALİZİ"
+        else:
+            return False, "HATA: Geçersiz analiz tipi."
+
         if df_satislar is None:
-            return False, f"HATA: '{kategori_ismi}' kategorisi için hiç satış verisi bulunamadı."
+            return False, f"HATA: '{isim}' için hiç satış verisi bulunamadı."
         
         df_satislar['tarih'] = pd.to_datetime(df_satislar['tarih'])
         
@@ -244,106 +286,39 @@ def analiz_et_kategori(kategori_ismi, gun_sayisi=7):
         if df_bu_periyot.empty or df_onceki_periyot.empty:
             return False, f"UYARI: Karşılaştırma için yeterli veri bulunamadı (Son {gun_sayisi} gün ve önceki {gun_sayisi} gün için)."
 
-        ozet_bu = _hesapla_kategori_ozeti(df_bu_periyot, 'isim') # Ürün bazlı pay
-        ozet_onceki = _hesapla_kategori_ozeti(df_onceki_periyot, 'isim') # Ürün bazlı pay
+        ozet_bu = _hesapla_kategori_ozeti(df_bu_periyot, grup_kolonu)
+        ozet_onceki = _hesapla_kategori_ozeti(df_onceki_periyot, grup_kolonu)
 
-        rapor = f"--- ÖNCEKİ PERİYOT (Son {gun_sayisi}-{gun_sayisi*2} Gün) ---\n"
-        rapor += f"  📊 TOPLAM KATEGORİ KARI: {ozet_onceki['toplam_kategori_kari']:.2f} TL\n"
-        rapor += "  Kar Payları (Bu kategori içinde):\n"
-        for urun, pay in ozet_onceki['urun_paylari'].items():
-            rapor += f"    - {urun:<20}: %{pay:.1f}  ({ozet_onceki['urun_karlari'].get(urun, 0):.2f} TL)\n"
+        rapor = f"{baslik}\n(Periyot: Son {gun_sayisi} gün vs Önceki {gun_sayisi} gün)\n"
+        rapor += "="*60 + "\n"
+
+        rapor += f"--- ÖNCEKİ PERİYOT (Son {gun_sayisi}-{gun_sayisi*2} Gün) ---\n"
+        rapor += f"  📊 TOPLAM KAR: {ozet_onceki['toplam_kari']:.2f} TL\n"
+        rapor += "  Kar Payları (Bu grup içinde):\n"
+        for item_name, pay in ozet_onceki['paylar'].items():
+            rapor += f"    - {item_name:<20}: %{pay:.1f}  ({ozet_onceki['karlar'].get(item_name, 0):.2f} TL)\n"
         
         rapor += f"\n--- BU PERİYOT (Son {gun_sayisi} Gün) ---\n"
-        rapor += f"  📊 TOPLAM KATEGORİ KARI: {ozet_bu['toplam_kategori_kari']:.2f} TL\n"
-        rapor += "  Kar Payları (Bu kategori içinde):\n"
-        for urun, pay in ozet_bu['urun_paylari'].items():
-            rapor += f"    - {urun:<20}: %{pay:.1f}  ({ozet_bu['urun_karlari'].get(urun, 0):.2f} TL)\n"
+        rapor += f"  📊 TOPLAM KAR: {ozet_bu['toplam_kari']:.2f} TL\n"
+        rapor += "  Kar Payları (Bu grup içinde):\n"
+        for item_name, pay in ozet_bu['paylar'].items():
+            rapor += f"    - {item_name:<20}: %{pay:.1f}  ({ozet_bu['karlar'].get(item_name, 0):.2f} TL)\n"
         
         rapor += "\n" + "="*60 + "\n"
         rapor += "  STRATEJİST TAVSİYESİ (Rasyonel Sonuç):\n"
         
-        fark = ozet_bu['toplam_kategori_kari'] - ozet_onceki['toplam_kategori_kari']
+        fark = ozet_bu['toplam_kari'] - ozet_onceki['toplam_kari']
         if fark > 0:
-            rapor += f"  ✅ BAŞARILI! '{kategori_ismi}' kategorisinin toplam karı {fark:.2f} TL ARTTI."
+            rapor += f"  ✅ BAŞARILI! '{isim}' grubunun/kategorisinin toplam karı {fark:.2f} TL ARTTI."
         else:
-            rapor += f"  ❌ DİKKAT! '{kategori_ismi}' kategorisinin toplam karı {abs(fark):.2f} TL AZALDI.\n"
-            rapor += "  Bir ürünün kar payı artmış olsa da, yamyamlık olmuş olabilir.\n"
+            rapor += f"  ❌ DİKKAT! '{isim}' grubunun/kategorisinin toplam karı {abs(fark):.2f} TL AZALDI.\n"
+            if tip == 'kategori_grubu':
+                rapor += "  Bir kategorinin payı artmış olsa da, daha karlı bir kategoriden 'çapraz yamyamlık' olmuş olabilir.\n"
+            else:
+                rapor += "  Bir ürünün payı artmış olsa da, 'iç yamyamlık' olmuş olabilir.\n"
             rapor += "  Bu fiyat politikasını GÖZDEN GEÇİRİN."
         
         return True, rapor
 
     except Exception as e:
-        return False, f"Kategori analizi hatası: {e}"
-
-def _hesapla_kategori_ozeti(df_periyot, grup_kolonu):
-    """Genel yardımcı fonksiyon (Kategori veya Grup için)"""
-    if df_periyot.empty:
-        return {'toplam_kategori_kari': 0, 'urun_karlari': {}, 'urun_paylari': {}}
-    
-    toplam_kategori_kari = df_periyot['hesaplanan_kar'].sum()
-    if toplam_kategori_kari <= 0:
-        return {'toplam_kategori_kari': toplam_kategori_kari, 'urun_karlari': {}, 'urun_paylari': {}}
-
-    urun_karlari = df_periyot.groupby(grup_kolonu)['hesaplanan_kar'].sum()
-    urun_paylari = (urun_karlari / toplam_kategori_kari) * 100
-    
-    return {
-        'toplam_kategori_kari': toplam_kategori_kari,
-        'urun_karlari': urun_karlari.to_dict(),
-        'urun_paylari': urun_paylari.to_dict()
-    }
-
-
-# --- Motor 5 (Colab Hücre 11): Kategori GRUBU Analizi (En Stratejik) ---
-
-def analiz_et_kategori_grubu(grup_ismi, gun_sayisi=7):
-    try:
-        df_satislar = _get_sales_by_filter('kategori_grubu', grup_ismi)
-        if df_satislar is None:
-            return False, f"HATA: '{grup_ismi}' kategori grubu için hiç satış verisi bulunamadı."
-        
-        df_satislar['tarih'] = pd.to_datetime(df_satislar['tarih'])
-        
-        bugun = datetime.now().date()
-        bu_periyot_basi = bugun - timedelta(days=gun_sayisi)
-        onceki_periyot_basi = bu_periyot_basi - timedelta(days=gun_sayisi)
-
-        df_bu_periyot = df_satislar[df_satislar['tarih'] >= pd.to_datetime(bu_periyot_basi)]
-        df_onceki_periyot = df_satislar[
-            (df_satislar['tarih'] >= pd.to_datetime(onceki_periyot_basi)) & 
-            (df_satislar['tarih'] < pd.to_datetime(bu_periyot_basi))
-        ]
-
-        if df_bu_periyot.empty or df_onceki_periyot.empty:
-            return False, f"UYARI: Karşılaştırma için yeterli veri bulunamadı (Son {gun_sayisi} gün ve önceki {gun_sayisi} gün için)."
-
-        ozet_bu = _hesapla_kategori_ozeti(df_bu_periyot, 'kategori') # Kategori bazlı pay
-        ozet_onceki = _hesapla_kategori_ozeti(df_onceki_periyot, 'kategori') # Kategori bazlı pay
-
-        rapor = f"--- ÖNCEKİ PERİYOT (Son {gun_sayisi}-{gun_sayisi*2} Gün) ---\n"
-        rapor += f"  📊 TOPLAM GRUP KARI: {ozet_onceki['toplam_kategori_kari']:.2f} TL\n"
-        rapor += "  Kategori Kar Payları (Bu grup içinde):\n"
-        for kategori, pay in ozet_onceki['urun_paylari'].items():
-            rapor += f"    - {kategori:<15}: %{pay:.1f}  ({ozet_onceki['urun_karlari'].get(kategori, 0):.2f} TL)\n"
-        
-        rapor += f"\n--- BU PERİYOT (Son {gun_sayisi} Gün) ---\n"
-        rapor += f"  📊 TOPLAM GRUP KARI: {ozet_bu['toplam_kategori_kari']:.2f} TL\n"
-        rapor += "  Kategori Kar Payları (Bu grup içinde):\n"
-        for kategori, pay in ozet_bu['urun_paylari'].items():
-            rapor += f"    - {kategori:<15}: %{pay:.1f}  ({ozet_bu['urun_karlari'].get(kategori, 0):.2f} TL)\n"
-        
-        rapor += "\n" + "="*60 + "\n"
-        rapor += "  GENEL STRATEJİST TAVSİYESİ (Rasyonel Sonuç):\n"
-        
-        fark = ozet_bu['toplam_kategori_kari'] - ozet_onceki['toplam_kategori_kari']
-        if fark > 0:
-            rapor += f"  ✅ BAŞARILI! '{grup_ismi}' grubunun toplam karı {fark:.2f} TL ARTTI."
-        else:
-            rapor += f"  ❌ DİKKAT! '{grup_ismi}' grubunun toplam karı {abs(fark):.2f} TL AZALDI.\n"
-            rapor += "  Bir kategorinin payı artmış olsa da, daha karlı bir kategoriden 'çapraz yamyamlık' olmuş olabilir.\n"
-            rapor += "  Bu genel fiyat stratejisini GÖZDEN GEÇİRİN."
-        
-        return True, rapor
-
-    except Exception as e:
-        return False, f"Kategori Grubu analizi hatası: {e}"
+        return False, f"Stratejik analiz hatası: {e}"
