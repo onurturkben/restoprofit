@@ -10,58 +10,107 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Vollkorn:wght@600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            /* 8px Boşluk Sistemi */
+            --bs-spacer: 1rem; /* 16px */
+            --spacer-1: 0.5rem; /* 8px */
+            --spacer-2: 1rem;   /* 16px */
+            --spacer-3: 1.5rem; /* 24px */
+            --spacer-4: 2rem;   /* 32px */
+            --spacer-5: 3rem;   /* 48px */
+            --spacer-6: 4rem;   /* 64px */
+        }
+    
         body {
-            /* Sensa'dan ilham alan sıcak bej/krem arka plan */
+            /* Arka Plan: Pasparlak beyaz değil */
             background-color: #fdfdf9; 
-            /* Sizin seçiminiz: Ana font Poppins */
+            /* Ana Font: Poppins */
             font-family: 'Poppins', sans-serif; 
-            color: #333; /* Saf siyahtan daha yumuşak bir metin rengi */
+            /* Gövde Metni: 16px, Regular (400) */
+            font-size: 16px;
+            font-weight: 400;
+            /* Satır Yüksekliği: 1.6 */
+            line-height: 1.6;
+            color: #333;
         }
         
-        /* Başlıklar (H1, H2, H3) "Sensa" gibi karakterli "Vollkorn" fontu olacak */
-        h1, h2, h3, h4, h5, .navbar-brand {
-            font-family: 'Vollkorn', serif;
-            font-weight: 600;
+        /* Tipografi Hiyerarşisi (Briften) */
+        h1, .h1 {
+            /* 40px, Bold (700) */
+            font-size: 40px; 
+            font-weight: 700;
+        }
+        h2, .h2 {
+            /* 32px, Bold (700) */
+            font-size: 32px;
+            font-weight: 700;
+        }
+        h3, .h3 {
+            /* 24px, Medium (500) */
+            font-size: 24px;
+            font-weight: 500;
+        }
+        p, .p {
+            /* 16px, Regular (400), 1.6 Satır Yüksekliği */
+            font-size: 16px;
+            font-weight: 400;
+            line-height: 1.6;
+        }
+        
+        /* Butonlar: Medium (500) */
+        .btn {
+            font-weight: 500;
         }
 
-        /* Navigasyon menüsü (Daha minimalist) */
+        /* Konteyner: Maksimum 1140px */
+        .container {
+            max-width: 1140px;
+        }
+
+        /* Minimalist Navbar */
         .navbar {
-            background-color: #ffffff !important; /* Temiz beyaz menü */
-            border-bottom: 1px solid #eee; /* Hafif bir ayırıcı */
+            background-color: #ffffff !important;
+            border-bottom: 1px solid #eee;
         }
-        
-        /* Kartlar (Daha "havadar", Sensa gibi) */
+        .navbar-brand {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700; /* Bold */
+            font-size: 20px;
+        }
+
+        /* Minimalist Kartlar */
         .card {
-            border: none; /* Çerçeveleri kaldır */
-            border-radius: 8px; /* Daha yumuşak kenarlar */
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
         }
         
-        /* Rapor sonuç kutusu */
+        /* Rapor Sonuç Kutusu */
         pre {
             background-color: #ffffff;
             border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 15px;
+            border-radius: 8px;
+            padding: var(--spacer-3); /* 24px */
             font-family: monospace;
             white-space: pre-wrap;
             word-wrap: break-word;
+            font-size: 14px;
         }
         
         /* İkon hizalaması */
         .bi {
             vertical-align: -0.125em;
-            margin-right: 0.25rem;
+            margin-right: var(--spacer-1); /* 8px */
         }
     </style>
     <title>RestoProfit Asistan - {{ title }}</title>
 
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white mb-4 shadow-sm">
-        <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-5"> <div class="container">
             <a class="navbar-brand text-dark" href="{{ url_for('dashboard') }}"><i class="bi bi-graph-up-arrow"></i> RestoProfit</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
@@ -82,9 +131,7 @@
         </div>
     </nav>
     
-    <div class="container mt-5 mb-5">
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
+    <div class="container mb-5"> {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
