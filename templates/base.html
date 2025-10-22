@@ -10,10 +10,12 @@
     <!-- Bootstrap İkonları -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <!-- Google Fonts -->
+    <!-- === "Sensa" Tasarım Stilleri === -->
+    
+    <!-- 1. Fontlar: Poppins ve Vollkorn -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&family=Vollkorn:wght@600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Vollkorn:wght@600&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -28,126 +30,111 @@
         }
     
         body {
-            /* Arka Plan: Pasparlak beyaz değil, sıcak bir bej/krem */
+            /* Arka Plan: Sıcak Bej/Krem */
             background-color: #fdfdf9; 
             /* Ana Font: Poppins */
             font-family: 'Poppins', sans-serif; 
-            /* Gövde Metni: 16px, Regular (400) */
             font-size: 16px;
             font-weight: 400;
-            /* Satır Yüksekliği: 1.6 */
             line-height: 1.6;
-            color: #333; /* Yumuşak siyah */
+            color: #333;
         }
         
         /* Tipografi Hiyerarşisi */
-        h1, .h1 {
+        h1, h2, h3, h4, h5, .navbar-brand {
             font-family: 'Vollkorn', serif;
-            font-size: 2.5rem; /* 40px */
             font-weight: 600;
             color: #1a202c;
         }
-        h2, .h2 {
-            font-family: 'Vollkorn', serif;
-            font-size: 2rem; /* 32px */
-            font-weight: 600;
-            color: #2d3748;
-        }
-        h3, .h3 {
-            font-size: 1.5rem; /* 24px */
-            font-weight: 500;
+        h1, .h1 { font-size: 2.5rem; } /* ~40px */
+        h2, .h2 { font-size: 2rem; } /* ~32px */
+        h3, .h3 { font-size: 1.5rem; } /* ~24px */
+
+        p, label, .form-text, .nav-link, .dropdown-item {
             font-family: 'Poppins', sans-serif;
-            color: #4a5568;
-        }
-        p, .p, label, .form-text {
-            font-size: 1rem; /* 16px */
             font-weight: 400;
-            line-height: 1.6;
-            color: #4a5568;
         }
 
-        /* Navigasyon Menüsü */
+        .btn {
+            font-weight: 500;
+        }
+
+        .container {
+            max-width: 1140px;
+        }
+
+        /* Minimalist Navbar */
         .navbar {
             background-color: #ffffff !important;
             border-bottom: 1px solid #e2e8f0;
         }
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 22px;
-            color: #2d3748 !important;
-            display: flex;
-            align-items: center;
-        }
-        .navbar-brand img {
-            height: 30px; /* Logo yüksekliği */
-            margin-right: 10px;
-        }
-        .nav-link {
-            font-weight: 500;
-            font-size: 15px;
-            padding-top: 0.75rem !important;
-            padding-bottom: 0.75rem !important;
+        
+        /* Kartlar */
+        .card {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
         }
         
-        /* Kartlar (Minimalist) */
-        .card {
-            border: 1px solid #e2e8f0;
-            border-radius: 0.75rem; /* 12px */
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-            background-color: #ffffff;
-        }
-
         /* Rapor Sonuç Kutusu */
         pre {
-            background-color: #f7fafc;
-            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
             border-radius: 8px;
-            padding: 24px;
-            font-family: 'Menlo', 'Monaco', 'Consolas', "Courier New", monospace;
+            padding: var(--spacer-3);
+            font-family: monospace;
             white-space: pre-wrap;
             word-wrap: break-word;
             font-size: 14px;
-            color: #2d3748;
         }
         
         /* İkonlar */
         .bi {
             vertical-align: -0.125em;
-            margin-right: 8px;
+            margin-right: var(--spacer-1);
         }
-        .nav-link .bi {
-            font-size: 1.25rem;
+
+        /* Navbar ikon boyutları ve hizalama */
+        .navbar-nav .nav-link .bi {
+             font-size: 1.1rem;
+             margin-right: 0.5rem;
+        }
+        .dropdown-toggle .bi-person-circle {
+            font-size: 1.4rem;
         }
         .dropdown-toggle::after {
             display: none;
         }
     </style>
+    
     <title>RestoProfit Asistan - {{ title }}</title>
+
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
-        <div class="container-xl">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-5">
+        <div class="container">
+            <a class="navbar-brand text-dark" href="{{ url_for('dashboard') }}">
                 <i class="bi bi-graph-up-arrow"></i>
-                <span>RestoProfit</span>
+                RestoProfit
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav w-100">
-                    <!-- Kullanıcı Giriş Yaptıysa Ana Navigasyon -->
+                    <!-- Kullanıcı Giriş Yaptıysa Ana Menü Linkleri -->
                     {% if current_user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-house-door"></i> Ana Ekran</a>
+                            <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-house-door-fill"></i> Ana Ekran</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('reports') }}"><i class="bi bi-calculator"></i> Analiz Motorları</a>
+                            <a class="nav-link" href="{{ url_for('reports') }}"><i class="bi bi-robot"></i> Analiz Motorları</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin_panel') }}"><i class="bi bi-gear"></i> Menü Yönetimi</a>
+                            <a class="nav-link" href="{{ url_for('admin_panel') }}"><i class="bi bi-gear-fill"></i> Menü Yönetimi</a>
                         </li>
-                        <!-- Kullanıcı Dropdown Menüsü (EN SAĞA İTİLDİ) -->
+
+                        <!-- Kullanıcı Dropdown Menüsü (En Sağa İtildi) -->
                         <li class="nav-item dropdown ms-auto">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle"></i> {{ current_user.username }}
@@ -159,7 +146,7 @@
                             </ul>
                         </li>
                     {% else %}
-                        <!-- Kullanıcı Giriş Yapmadıysa -->
+                        <!-- Kullanıcı Giriş Yapmadıysa (Sadece Giriş Linki) -->
                         <li class="nav-item ms-auto">
                             <a class="nav-link" href="{{ url_for('login') }}"><i class="bi bi-box-arrow-in-right"></i> Giriş Yap</a>
                         </li>
@@ -169,7 +156,7 @@
         </div>
     </nav>
     
-    <main class="container my-5">
+    <main class="container mb-5">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -187,4 +174,3 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
