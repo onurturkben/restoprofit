@@ -1,31 +1,28 @@
-# app.py (Final Corrected Version)
+# app.py (TÜM GÜNCELLEMELER DAHİL - CRUD + Veri Yönetimi)
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from database import (
-    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
-    guncelle_tum_urun_maliyetleri
+    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User
 )
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 import pandas as pd
 from datetime import datetime
-from sqlalchemy.exc import IntegrityError
 from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-from sqlalchemy import func
-
-# --- Analiz Motorlarını "Beyinden" İçe Aktar ---
-from analysis_engine import (
-    hesapla_hedef_marj,
-    simule_et_fiyat_degisikligi,
-    bul_optimum_fiyat,
-    analiz_et_kategori_veya_grup
-)
+import warnings
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'renderda_bunu_kesin_degistirmelisiniz123')
+
+# Veritabanı bağlantısı
 init_db(app)
+
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -36,17 +33,35 @@ login_manager.login_message_category = "warning"
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-
 # --- İLK KULLANICIYI OLUŞTUR ---
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
-        # Lütfen bu şifreyi ilk girişten sonra hemen değiştirin!
         hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
         admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
         db.session.commit()
         print("Güvenli kullanıcı oluşturuldu.")
+
+# --- YÖNETİM FONKSİYONLARI (Maliyet Hesaplama) ---
+def guncelle_tum_urun_maliyetleri():
+    """Tüm ürünlerin maliyetlerini reçetelere göre günceller."""
+    try:
+        urunler = Urun.query.all()
+        for urun in urunler:
+            toplam_maliyet = 0.0
+            receteler = Recete.query.filter_by(urun_id=urun.id).all()
+            for recete_kalemi in receteler:
+                if recete_kalemi.hammadde:
+                    toplam_maliyet += recete_kalemi.miktar * recete_kalemi.hammadde.maliyet_fiyati
+            urun.hesaplanan_maliyet = toplam_maliyet
+        db.session.commit()
+        print("Tüm ürün maliyetleri yeniden hesaplandı.")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"Maliyet güncelleme hatası: {e}")
+        return False
 
 # --- GÜVENLİK SAYFALARI ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -124,7 +139,7 @@ def dashboard():
     return render_template('dashboard.html', title='Ana Ekran', summary=summary)
 
 
-# --- VERİ YÖNETİMİ ---
+# --- EXCEL YÜKLEME ---
 @app.route('/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -192,8 +207,8 @@ def upload_excel():
         
     return redirect(url_for('dashboard'))
 
-# --- YÖNETİM PANELİ (CRUD) ---
 
+# --- YÖNETİM PANELİ (CRUD) ---
 @app.route('/admin')
 @login_required
 def admin_panel():
@@ -210,6 +225,7 @@ def admin_panel():
                            urunler=urunler, 
                            receteler=receteler)
 
+# --- HAMMADDE CRUD ---
 @app.route('/add-material', methods=['POST'])
 @login_required
 def add_material():
@@ -232,7 +248,49 @@ def add_material():
         
     return redirect(url_for('admin_panel'))
 
+@app.route('/edit-material/<int:id>', methods=['POST'])
+@login_required
+def edit_material(id):
+    try:
+        hammadde = db.session.get(Hammadde, id)
+        if not hammadde:
+            flash('Hammadde bulunamadı.', 'danger')
+            return redirect(url_for('admin_panel'))
+        
+        hammadde.isim = request.form.get('isim')
+        hammadde.maliyet_birimi = request.form.get('birim')
+        hammadde.maliyet_fiyati = float(request.form.get('fiyat'))
+        db.session.commit()
+        guncelle_tum_urun_maliyetleri()
+        flash(f"'{hammadde.isim}' güncellendi.", 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Güncelleme sırasında bir hata oluştu: {e}", 'danger')
+    return redirect(url_for('admin_panel'))
 
+@app.route('/delete-material/<int:id>', methods=['POST'])
+@login_required
+def delete_material(id):
+    try:
+        hammadde = db.session.get(Hammadde, id)
+        if hammadde:
+            # Reçetelerde kullanılıp kullanılmadığını kontrol et
+            in_recipe = Recete.query.filter_by(hammadde_id=id).first()
+            if in_recipe:
+                flash(f"HATA: '{hammadde.isim}' bir veya daha fazla reçetede kullanıldığı için silinemez.", 'danger')
+                return redirect(url_for('admin_panel'))
+                
+            db.session.delete(hammadde)
+            db.session.commit()
+            flash(f"'{hammadde.isim}' silindi.", 'success')
+        else:
+            flash("Hammadde bulunamadı.", 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: {e}", 'danger')
+    return redirect(url_for('admin_panel'))
+
+# --- ÜRÜN CRUD ---
 @app.route('/add-product', methods=['POST'])
 @login_required
 def add_product():
@@ -263,7 +321,52 @@ def add_product():
         flash(f"HATA: Ürün eklenirken bir hata oluştu: {e}", 'danger')
         
     return redirect(url_for('admin_panel'))
+    
+@app.route('/edit-product/<int:id>', methods=['POST'])
+@login_required
+def edit_product(id):
+    try:
+        urun = db.session.get(Urun, id)
+        if not urun:
+            flash('Ürün bulunamadı.', 'danger')
+            return redirect(url_for('admin_panel'))
+            
+        urun.isim = request.form.get('isim')
+        urun.excel_adi = request.form.get('excel_adi')
+        urun.mevcut_satis_fiyati = float(request.form.get('fiyat'))
+        urun.kategori = request.form.get('kategori')
+        urun.kategori_grubu = request.form.get('grup')
+        db.session.commit()
+        
+        # Ürün fiyatı değişti, maliyetleri de yeniden hesaplayalım (maliyet değişmese bile kar marjı değişir)
+        guncelle_tum_urun_maliyetleri()
+        
+        flash(f"'{urun.isim}' güncellendi.", 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Güncelleme sırasında bir hata oluştu: {e}", 'danger')
+    return redirect(url_for('admin_panel'))
 
+@app.route('/delete-product/<int:id>', methods=['POST'])
+@login_required
+def delete_product(id):
+    try:
+        urun = db.session.get(Urun, id)
+        if urun:
+            # İlişkili satış kayıtlarını ve reçeteleri de sil
+            SatisKaydi.query.filter_by(urun_id=id).delete()
+            Recete.query.filter_by(urun_id=id).delete()
+            db.session.delete(urun)
+            db.session.commit()
+            flash(f"'{urun.isim}' ürünü ve ilgili tüm veriler silindi.", 'success')
+        else:
+            flash("Ürün bulunamadı.", 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Ürün silinirken bir hata oluştu: {e}", 'danger')
+    return redirect(url_for('admin_panel'))
+
+# --- REÇETE CRUD ---
 @app.route('/add-recipe', methods=['POST'])
 @login_required
 def add_recipe():
@@ -288,6 +391,23 @@ def add_recipe():
         db.session.rollback()
         flash(f"HATA: Reçete eklenirken bir hata oluştu: {e}", 'danger')
         
+    return redirect(url_for('admin_panel'))
+
+@app.route('/delete-recipe/<int:id>', methods=['POST'])
+@login_required
+def delete_recipe(id):
+    try:
+        recete_item = db.session.get(Recete, id)
+        if recete_item:
+            db.session.delete(recete_item)
+            db.session.commit()
+            guncelle_tum_urun_maliyetleri()
+            flash("Reçete kalemi silindi.", 'success')
+        else:
+            flash("Reçete kalemi bulunamadı.", 'warning')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Reçete kalemi silinirken bir hata oluştu: {e}", 'danger')
     return redirect(url_for('admin_panel'))
 
 
@@ -322,17 +442,65 @@ def delete_sales_by_date():
         
     return redirect(url_for('admin_panel'))
 
+# --- ŞİFRE DEĞİŞTİRME ---
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
+            flash('Mevcut şifreniz hatalı.', 'danger')
+            return redirect(url_for('change_password'))
+            
+        if new_password != confirm_password:
+            flash('Yeni şifreler birbiriyle eşleşmiyor.', 'danger')
+            return redirect(url_for('change_password'))
+            
+        if len(new_password) < 6:
+            flash('Yeni şifreniz en az 6 karakter olmalıdır.', 'danger')
+            return redirect(url_for('change_password'))
+
+        try:
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            current_user.password_hash = hashed_password
+            db.session.commit()
+            flash('Şifreniz başarıyla güncellendi. Lütfen yeni şifrenizle tekrar giriş yapın.', 'success')
+            return redirect(url_for('logout')) 
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Şifre güncellenirken bir hata oluştu: {e}", 'danger')
+            return redirect(url_for('change_password'))
+            
+    return render_template('change_password.html', title='Şifre Değiştir')
+
 
 # --- ANALİZ RAPORLARI SAYFASI ---
 @app.route('/reports', methods=['GET', 'POST'])
 @login_required
 def reports():
-    # Bu listeler formları doldurmak için gerekli
-    urun_listesi = [u.isim for u in Urun.query.order_by(Urun.isim).all()]
-    kategori_listesi = sorted(list(set([u.kategori for u in Urun.query.all() if u.kategori])))
-    grup_listesi = sorted(list(set([u.kategori_grubu for u in Urun.query.all() if u.kategori_grubu])))
+    try:
+        urunler = Urun.query.order_by(Urun.isim).all()
+        urun_listesi = [u.isim for u in urunler]
+        
+        kategoriler_db = db.session.query(Urun.kategori).distinct().all()
+        kategori_listesi = sorted([k[0] for k in kategoriler_db if k[0]])
+        
+        gruplar_db = db.session.query(Urun.kategori_grubu).distinct().all()
+        grup_listesi = sorted([g[0] for g in gruplar_db if g[0]])
+        
+    except Exception as e:
+        flash(f'Veritabanından listeler çekilirken hata oluştu: {e}', 'danger')
+        urun_listesi = []
+        kategori_listesi = []
+        grup_listesi = []
+
     
     analiz_sonucu = None
+    chart_data = None 
     
     if request.method == 'POST':
         try:
@@ -342,42 +510,63 @@ def reports():
                 urun_ismi = request.form.get('urun_ismi')
                 hedef_marj = float(request.form.get('hedef_marj'))
                 success, sonuc = hesapla_hedef_marj(urun_ismi, hedef_marj)
+                analiz_sonucu = sonuc
+                if not success:
+                    flash(sonuc, 'danger')
             
             elif analiz_tipi == 'simulasyon':
                 urun_ismi = request.form.get('urun_ismi')
                 yeni_fiyat = float(request.form.get('yeni_fiyat'))
                 success, sonuc = simule_et_fiyat_degisikligi(urun_ismi, yeni_fiyat)
+                analiz_sonucu = sonuc
+                if not success:
+                    flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'optimum_fiyat':
                 urun_ismi = request.form.get('urun_ismi')
-                success, sonuc = bul_optimum_fiyat(urun_ismi)
+                # Modelin hem metin raporunu hem de grafik verisini döndürmesi için güncellenmesi gerekiyor
+                # Şimdilik, analysis_engine.py'nin buna göre güncellendiğini varsayıyoruz
+                # GÜNCELLEME: analysis_engine.py'yi chart_data döndürecek şekilde değiştirmemiz gerekecek.
+                # Şimdilik sadece metni alıyoruz.
+                success, sonuc, chart_data_json = bul_optimum_fiyat(urun_ismi)
+                analiz_sonucu = sonuc
+                chart_data = chart_data_json # Grafiği şablona gönder
+                if not success:
+                    flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'kategori':
                 kategori_ismi = request.form.get('kategori_ismi')
                 gun_sayisi = int(request.form.get('gun_sayisi', 7))
-                success, sonuc = analiz_et_kategori_veya_grup('kategori', kategori_ismi, gun_sayisi)
+                success, sonuc, chart_data_json = analiz_et_kategori_veya_grup('kategori', kategori_ismi, gun_sayisi)
+                analiz_sonucu = sonuc
+                chart_data = chart_data_json
+                if not success:
+                    flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'grup':
                 grup_ismi = request.form.get('grup_ismi')
                 gun_sayisi = int(request.form.get('gun_sayisi', 7))
-                success, sonuc = analiz_et_kategori_veya_grup('kategori_grubu', grup_ismi, gun_sayisi)
+                success, sonuc, chart_data_json = analiz_et_kategori_veya_grup('kategori_grubu', grup_ismi, gun_sayisi)
+                analiz_sonucu = sonuc
+                chart_data = chart_data_json
+                if not success:
+                    flash(sonuc, 'danger')
             
             else:
-                success, sonuc = False, "Geçersiz analiz tipi."
-
-            analiz_sonucu = sonuc
-            if not success:
-                flash(sonuc, 'danger')
+                flash("Geçersiz analiz tipi seçildi.", "warning")
 
         except Exception as e:
-            flash(f"Analiz motoru hatası: {e}", 'danger')
+            flash(f"Analiz sırasında bir hata oluştu: {e}", 'danger')
 
     return render_template('reports.html', title='Analiz Motorları',
                            urun_listesi=urun_listesi,
                            kategori_listesi=kategori_listesi,
                            grup_listesi=grup_listesi,
-                           analiz_sonucu=analiz_sonucu)
+                           analiz_sonucu=analiz_sonucu,
+                           chart_data=chart_data)
+
 
 # Render.com'un uygulamayı çalıştırması için
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
