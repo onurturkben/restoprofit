@@ -1,4 +1,4 @@
-# app.py
+# app.py (DÜZELTİLMİŞ VERSİYON)
 # Bu, ana web sunucusu dosyamızdır (Flask).
 # Arayüzü (HTML) "beyne" (analysis_engine) ve "hafızaya" (database) bağlar.
 
@@ -45,7 +45,6 @@ def dashboard():
                 df = pd.read_excel(file)
                 
                 # 2. Gerekli haritaları (eşleştirme) veritabanından çek
-                # (Teknik borcu ödedik: Sadece o anki güncel maliyetleri alıyoruz)
                 urunler_db = Urun.query.all()
                 urun_eslestirme_haritasi = {u.excel_adi: u.id for u in urunler_db}
                 urun_maliyet_haritasi = {u.id: u.hesaplanan_maliyet for u in urunler_db}
@@ -69,7 +68,6 @@ def dashboard():
                     if adet == 0: continue # 0 adetli satırları atla
                     
                     # 4. TEKNİK BORÇ ÇÖZÜMÜ:
-                    # Maliyeti, o anki güncel maliyet haritasından al
                     o_anki_maliyet = urun_maliyet_haritasi.get(urun_id, 0)
                     
                     # Hesaplamaları yap ve veritabanına "kilitle"
@@ -102,7 +100,6 @@ def dashboard():
             return redirect(url_for('dashboard'))
 
     # 'GET' isteği (sayfa ilk açıldığında)
-    # Ana sayfa için özet verileri çek
     try:
         toplam_satis_kaydi = db.session.query(SatisKaydi).count()
         toplam_urun = db.session.query(Urun).count()
@@ -139,12 +136,7 @@ def admin_panel():
 def reset_menu_data():
     """ 
     YÖNETİM PANELİNDEKİ "MENÜYÜ SIFIRLA" BUTONUNUN ÇALIŞTIRDIĞI YER
-    Verileri kodun içinden alır (Colab'deki Hücre 3 gibi).
-    Gelecekte bu, formdan veri alacak şekilde geliştirilebilir.
     """
-    
-    # --- Colab Hücre 3'teki verilerinizi buraya gömüyoruz ---
-    # (DİKKAT: menuyu_sifirla_ve_kur SATIŞLARI SİLMEZ, GÜVENLİDİR)
     
     hammaddeler_data = [
         ('Köfte Harcı', 'kg', 1200.0), ('Cheeseburger Ekmeği', 'adet', 15.0),
@@ -169,7 +161,6 @@ def reset_menu_data():
         ('Pesto Makarna', 'Makarna (Pişmemiş)', 0.120), ('Pesto Makarna', 'Pesto Sos', 0.080),        
         ('Domates Çorbası', 'Domates', 0.250), ('Bira 50cl', 'Bira (Fıçı)', 0.5), 
     ]
-    # --- Veri bitti ---
     
     success, message = menuyu_sifirla_ve_kur(hammaddeler_data, urunler_data, receteler_data)
     
@@ -194,26 +185,27 @@ def reports():
         try:
             analiz_tipi = request.form.get('analiz_tipi')
             
-            if analiz_tipi == 'hedef_marj': (Hücre 9)
+            # --- HATA BURADAYDI, DÜZELTİLDİ ---
+            if analiz_tipi == 'hedef_marj': # (Hücre 9) - Yorum # ile düzeltildi
                 urun_ismi = request.form.get('urun_ismi')
                 hedef_marj = float(request.form.get('hedef_marj'))
                 success, sonuc = hesapla_hedef_marj(urun_ismi, hedef_marj)
             
-            elif analiz_tipi == 'simulasyon': (Hücre 7)
+            elif analiz_tipi == 'simulasyon': # (Hücre 7) - Yorum # ile düzeltildi
                 urun_ismi = request.form.get('urun_ismi')
                 yeni_fiyat = float(request.form.get('yeni_fiyat'))
                 success, sonuc = simule_et_fiyat_degisikligi(urun_ismi, yeni_fiyat)
                 
-            elif analiz_tipi == 'optimum_fiyat': (Hücre 8)
+            elif analiz_tipi == 'optimum_fiyat': # (Hücre 8) - Yorum # ile düzeltildi
                 urun_ismi = request.form.get('urun_ismi')
                 success, sonuc = bul_optimum_fiyat(urun_ismi)
                 
-            elif analiz_tipi == 'kategori': (Hücre 10)
+            elif analiz_tipi == 'kategori': # (Hücre 10) - Yorum # ile düzeltildi
                 kategori_ismi = request.form.get('kategori_ismi')
                 gun_sayisi = int(request.form.get('gun_sayisi', 7))
                 success, sonuc = analiz_et_kategori_veya_grup('kategori', kategori_ismi, gun_sayisi)
                 
-            elif analiz_tipi == 'grup': (Hücre 11)
+            elif analiz_tipi == 'grup': # (Hücre 11) - Yorum # ile düzeltildi
                 grup_ismi = request.form.get('grup_ismi')
                 gun_sayisi = int(request.form.get('gun_sayisi', 7))
                 success, sonuc = analiz_et_kategori_veya_grup('kategori_grubu', grup_ismi, gun_sayisi)
@@ -228,7 +220,6 @@ def reports():
         except Exception as e:
             flash(f"Analiz motoru hatası: {e}", 'danger')
 
-    # Rapor sonucunu <pre> etiketiyle göstermek için 'reports.html'e gönder
     return render_template('reports.html', title='Analiz Motorları',
                            urun_listesi=urun_listesi,
                            kategori_listesi=kategori_listesi,
