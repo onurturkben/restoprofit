@@ -1,4 +1,4 @@
-# app.py (TÜM GÜNCELLEMELER DAHİL - TAM VE HATASIZ SÜRÜM)
+# app.py (Final Corrected Version)
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from database import (
@@ -13,6 +13,14 @@ from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 from sqlalchemy import func
+
+# --- Analiz Motorlarını "Beyinden" İçe Aktar ---
+from analysis_engine import (
+    hesapla_hedef_marj,
+    simule_et_fiyat_degisikligi,
+    bul_optimum_fiyat,
+    analiz_et_kategori_veya_grup
+)
 
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
@@ -33,18 +41,18 @@ def load_user(user_id):
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
+        # Lütfen bu şifreyi ilk girişten sonra hemen değiştirin!
         hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
         admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
         db.session.commit()
         print("Güvenli kullanıcı oluşturuldu.")
 
-
 # --- GÜVENLİK SAYFALARI ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('dashboard')) 
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -57,7 +65,7 @@ def login():
     return render_template('login.html', title='Giriş Yap')
 
 @app.route('/logout')
-@login_required
+@login_required 
 def logout():
     logout_user()
     flash('Başarıyla çıkış yaptınız.', 'info')
@@ -70,7 +78,7 @@ def change_password():
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-
+        
         if not bcrypt.check_password_hash(current_user.password_hash, current_password):
             flash('Mevcut şifreniz hatalı.', 'danger')
             return redirect(url_for('change_password'))
@@ -98,9 +106,9 @@ def change_password():
     return render_template('change_password.html', title='Şifre Değiştir')
 
 
-# --- ANA SAYFA (DASHBOARD) ---
+# --- ANA SAYFA ---
 @app.route('/')
-@login_required
+@login_required 
 def dashboard():
     try:
         toplam_satis_kaydi = db.session.query(SatisKaydi).count()
@@ -116,7 +124,7 @@ def dashboard():
     return render_template('dashboard.html', title='Ana Ekran', summary=summary)
 
 
-# --- EXCEL YÜKLEME ---
+# --- VERİ YÖNETİMİ ---
 @app.route('/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -139,41 +147,42 @@ def upload_excel():
             
             urunler_db = Urun.query.all()
             urun_eslestirme_haritasi = {u.excel_adi: u.id for u in urunler_db}
-            urun_maliyet_haritasi = {u.id: u.hesaplanan_maliyet for u in urunler_db}
             
-            yeni_kayit_listesi = []
-            taninmayan_urunler = set()
-            
-            for index, satir in df.iterrows():
-                excel_urun_adi = satir['Urun_Adi']
-                adet = int(satir['Adet'])
-                toplam_tutar = float(satir['Toplam_Tutar'])
-                tarih = pd.to_datetime(satir['Tarih'])
+            with app.app_context():
+                urun_maliyet_haritasi = {u.id: u.hesaplanan_maliyet for u in urunler_db}
+                yeni_kayit_listesi = []
+                taninmayan_urunler = set()
                 
-                urun_id = urun_eslestirme_haritasi.get(excel_urun_adi)
-                if not urun_id:
-                    taninmayan_urunler.add(excel_urun_adi)
-                    continue
-                if adet == 0: continue
+                for index, satir in df.iterrows():
+                    excel_urun_adi = satir['Urun_Adi']
+                    adet = int(satir['Adet'])
+                    toplam_tutar = float(satir['Toplam_Tutar'])
+                    tarih = pd.to_datetime(satir['Tarih'])
+                    
+                    urun_id = urun_eslestirme_haritasi.get(excel_urun_adi)
+                    if not urun_id:
+                        taninmayan_urunler.add(excel_urun_adi)
+                        continue
+                    if adet == 0: continue
+                    
+                    o_anki_maliyet = urun_maliyet_haritasi.get(urun_id, 0)
+                    hesaplanan_toplam_maliyet = o_anki_maliyet * adet
+                    hesaplanan_kar = toplam_tutar - hesaplanan_toplam_maliyet
+                    
+                    yeni_kayit = SatisKaydi(
+                        urun_id=urun_id, tarih=tarih, adet=adet, toplam_tutar=toplam_tutar,
+                        hesaplanan_birim_fiyat=(toplam_tutar / adet),
+                        hesaplanan_maliyet=hesaplanan_toplam_maliyet,
+                        hesaplanan_kar=hesaplanan_kar
+                    )
+                    yeni_kayit_listesi.append(yeni_kayit)
                 
-                o_anki_maliyet = urun_maliyet_haritasi.get(urun_id, 0)
-                hesaplanan_toplam_maliyet = o_anki_maliyet * adet
-                hesaplanan_kar = toplam_tutar - hesaplanan_toplam_maliyet
+                db.session.add_all(yeni_kayit_listesi)
+                db.session.commit()
                 
-                yeni_kayit = SatisKaydi(
-                    urun_id=urun_id, tarih=tarih, adet=adet, toplam_tutar=toplam_tutar,
-                    hesaplanan_birim_fiyat=(toplam_tutar / adet),
-                    hesaplanan_maliyet=hesaplanan_toplam_maliyet,
-                    hesaplanan_kar=hesaplanan_kar
-                )
-                yeni_kayit_listesi.append(yeni_kayit)
-            
-            db.session.add_all(yeni_kayit_listesi)
-            db.session.commit()
-            
-            flash(f'Başarılı! {len(yeni_kayit_listesi)} adet satış kaydı veritabanına işlendi.', 'success')
-            if taninmayan_urunler:
-                flash(f"UYARI: Şu ürünler tanınmadı ve atlandı: {', '.join(taninmayan_urunler)}", 'warning')
+                flash(f'Başarılı! {len(yeni_kayit_listesi)} adet satış kaydı veritabanına işlendi.', 'success')
+                if taninmayan_urunler:
+                    flash(f"UYARI: Şu ürünler tanınmadı ve atlandı: {', '.join(taninmayan_urunler)}", 'warning')
 
         except ValueError as ve:
             flash(f"HATA OLUŞTU: {ve}", 'danger')
@@ -183,19 +192,15 @@ def upload_excel():
         
     return redirect(url_for('dashboard'))
 
+# --- YÖNETİM PANELİ (CRUD) ---
 
-# --- YÖNETİM PANELİ (Faz 5: CRUD) ---
 @app.route('/admin')
 @login_required
 def admin_panel():
     try:
-        # Formlardaki açılır menüleri doldurmak için bu listeleri çekiyoruz
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
-        
-        # Internal Server Error hatasını düzelten sorgu
         receteler = Recete.query.join(Urun).join(Hammadde).order_by(Urun.isim, Hammadde.isim).all()
-        
     except Exception as e:
         flash(f'Veritabanı hatası: {e}', 'danger')
         hammaddeler, urunler, receteler = [], [], []
@@ -220,7 +225,7 @@ def add_material():
     
     except IntegrityError: 
         db.session.rollback()
-        flash(f"HATA: '{isim}' adında bir hammadde zaten mevcut. Eklenemedi.", 'danger')
+        flash(f"HATA: '{isim}' adında bir hammadde zaten mevcut.", 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Hammadde eklenirken bir hata oluştu: {e}", 'danger')
@@ -277,8 +282,6 @@ def add_recipe():
             flash("Başarılı! Reçete kalemi eklendi.", 'success')
         
         db.session.commit()
-        
-        # Reçete eklendiği anda, o ürünün toplam maliyetini GÜNCELLE
         guncelle_tum_urun_maliyetleri()
         
     except Exception as e:
@@ -318,41 +321,6 @@ def delete_sales_by_date():
         flash(f"HATA: Satış kayıtları silinirken bir hata oluştu: {e}", 'danger')
         
     return redirect(url_for('admin_panel'))
-
-# --- ŞİFRE DEĞİŞTİRME ---
-@app.route('/change-password', methods=['GET', 'POST'])
-@login_required
-def change_password():
-    if request.method == 'POST':
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-        
-        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
-            flash('Mevcut şifreniz hatalı.', 'danger')
-            return redirect(url_for('change_password'))
-            
-        if new_password != confirm_password:
-            flash('Yeni şifreler birbiriyle eşleşmiyor.', 'danger')
-            return redirect(url_for('change_password'))
-            
-        if len(new_password) < 6:
-            flash('Yeni şifreniz en az 6 karakter olmalıdır.', 'danger')
-            return redirect(url_for('change_password'))
-
-        try:
-            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
-            current_user.password_hash = hashed_password
-            db.session.commit()
-            flash('Şifreniz başarıyla güncellendi. Lütfen yeni şifrenizle tekrar giriş yapın.', 'success')
-            return redirect(url_for('logout')) 
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Şifre güncellenirken bir hata oluştu: {e}", 'danger')
-            return redirect(url_for('change_password'))
-            
-    return render_template('change_password.html', title='Şifre Değiştir')
 
 
 # --- ANALİZ RAPORLARI SAYFASI ---
