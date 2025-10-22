@@ -1,4 +1,4 @@
-# app.py (FAZ 5, AŞAMA 2: GERÇEK CRUD YÖNETİM PANELİ)
+# app.py (FAZ 5, AŞAMA 3: VERİ YÖNETİMİ EKLENDİ)
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from database import (
@@ -12,6 +12,7 @@ from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
+from sqlalchemy import func # YENİ EKLENDİ: Tarih bazlı filtreleme için
 
 # --- Analiz Motorlarını "Beyinden" İçe Aktar ---
 from analysis_engine import (
@@ -36,11 +37,11 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# --- İLK KULLANICIYI OLUŞTUR (Bir önceki adımdan) ---
+# --- İLK KULLANICIYI OLUŞTUR ---
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
-        # (Burada sizin bir önceki adımda yazdığınız güvenli şifreniz olmalı)
+        # Lütfen kendi güçlü şifrenizi kullanın
         hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
         admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
@@ -162,7 +163,7 @@ def upload_excel():
     return redirect(url_for('dashboard'))
 
 
-# --- YÖNETİM PANELİ (Faz 5, Aşama 2: CRUD) ---
+# --- YÖNETİM PANELİ (Faz 5: CRUD) ---
 @app.route('/admin')
 @login_required
 def admin_panel():
@@ -171,7 +172,7 @@ def admin_panel():
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
         
-        # --- HATA DÜZELTİLDİ: join(Hammadde) eklendi ---
+        # HATA DÜZELTİLDİ: join(Hammadde) eklendi
         receteler = Recete.query.join(Urun).join(Hammadde).order_by(Urun.isim, Hammadde.isim).all()
         
     except Exception as e:
@@ -249,7 +250,7 @@ def add_recipe():
         hammadde_id = int(request.form.get('r_hammadde_id'))
         miktar = float(request.form.get('r_miktar'))
         
-        # Bu reçete kalemi zaten var mı? (Gelecekte "güncelleme" için geliştirilebilir)
+        # Bu reçete kalemi zaten var mı?
         existing_recipe = Recete.query.filter_by(urun_id=urun_id, hammadde_id=hammadde_id).first()
         if existing_recipe:
             flash("UYARI: Bu ürün için bu hammadde zaten reçetede vardı. Miktarı güncellendi.", 'warning')
@@ -261,7 +262,6 @@ def add_recipe():
         
         db.session.commit()
         
-        # --- ÇOK ÖNEMLİ ---
         # Reçete eklendiği anda, o ürünün toplam maliyetini GÜNCELLE
         guncelle_tum_urun_maliyetleri()
         
@@ -272,10 +272,43 @@ def add_recipe():
     return redirect(url_for('admin_panel'))
 
 
-# --- ARTIK GEREKLİ DEĞİL (Kullanıcı dostu değil): reset_menu_data fonksiyonu kaldırıldı ---
+# --- YENİ EKLENDİ (Faz 5): Tarihe Göre Satış Silme Motoru ---
+@app.route('/delete-sales-by-date', methods=['POST'])
+@login_required
+def delete_sales_by_date():
+    try:
+        date_str = request.form.get('delete_date')
+        if not date_str:
+            flash("HATA: Lütfen silmek için geçerli bir tarih seçin.", 'danger')
+            return redirect(url_for('admin_panel'))
+            
+        # Gelen 'YYYY-MM-DD' formatındaki string'i date objesine çevir
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # SQLAlchemy'nin func.date() fonksiyonu ile SatisKaydi.tarih (datetime)
+        # alanının sadece tarih kısmına göre filtrele
+        num_deleted = db.session.query(SatisKaydi).filter(
+            func.date(SatisKaydi.tarih) == target_date
+        ).delete(synchronize_session=False)
+        
+        db.session.commit()
+        
+        if num_deleted > 0:
+            flash(f"Başarılı! {target_date.strftime('%d %B %Y')} tarihine ait {num_deleted} adet satış kaydı kalıcı olarak silindi.", 'success')
+        else:
+            flash(f"Bilgi: {target_date.strftime('%d %B %Y')} tarihinde zaten hiç satış kaydı bulunamadı.", 'info')
+            
+    except ValueError:
+         flash("HATA: Geçersiz tarih formatı.", 'danger')
+         db.session.rollback()
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Satış kayıtları silinirken bir hata oluştu: {e}", 'danger')
+        
+    return redirect(url_for('admin_panel'))
 
 
-# --- ANALİZ RAPORLARI SAYFASI (Değişiklik yok) ---
+# --- ANALİZ RAPORLARI SAYFASI ---
 @app.route('/reports', methods=['GET', 'POST'])
 @login_required
 def reports():
