@@ -170,12 +170,14 @@ def admin_panel():
         # Formlardaki (Reçete) açılır menüleri doldurmak için bu listeleri çekiyoruz
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
-        # Tablodaki reçeteleri çekiyoruz
-        receteler = Recete.query.join(Urun).order_by(Urun.isim, Hammadde.isim).all()
+        
+        # --- HATA DÜZELTİLDİ: join(Hammadde) eklendi ---
+        receteler = Recete.query.join(Urun).join(Hammadde).order_by(Urun.isim, Hammadde.isim).all()
+        
     except Exception as e:
         flash(f'Veritabanı hatası: {e}', 'danger')
         hammaddeler, urunler, receteler = [], [], []
-        
+            
     return render_template('admin.html', title='Menü Yönetimi', 
                            hammaddeler=hammaddeler, 
                            urunler=urunler, 
