@@ -1,4 +1,4 @@
-# app.py (FAZ 5, AŞAMA 3: VERİ YÖNETİMİ EKLENDİ)
+# app.py (FAZ 5, AŞAMA 4: ŞİFRE DEĞİŞTİRME EKLENDİ)
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from database import (
@@ -12,7 +12,7 @@ from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-from sqlalchemy import func # YENİ EKLENDİ: Tarih bazlı filtreleme için
+from sqlalchemy import func # Tarih bazlı filtreleme için
 
 # --- Analiz Motorlarını "Beyinden" İçe Aktar ---
 from analysis_engine import (
@@ -306,6 +306,48 @@ def delete_sales_by_date():
         flash(f"HATA: Satış kayıtları silinirken bir hata oluştu: {e}", 'danger')
         
     return redirect(url_for('admin_panel'))
+
+# --- YENİ EKLENDİ (Faz 5): Şifre Değiştirme Motoru ---
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # 1. Mevcut Şifre Kontrolü
+        if not bcrypt.check_password_hash(current_user.password_hash, current_password):
+            flash('Mevcut şifreniz hatalı.', 'danger')
+            return redirect(url_for('change_password'))
+            
+        # 2. Yeni Şifre Tekrar Kontrolü
+        if new_password != confirm_password:
+            flash('Yeni şifreler birbiriyle eşleşmiyor.', 'danger')
+            return redirect(url_for('change_password'))
+            
+        # 3. Şifre Uzunluk Kontrolü
+        if len(new_password) < 6:
+            flash('Yeni şifreniz en az 6 karakter olmalıdır.', 'danger')
+            return redirect(url_for('change_password'))
+
+        try:
+            # 4. Şifreyi Hash'le ve Güncelle
+            hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            current_user.password_hash = hashed_password
+            db.session.commit()
+            flash('Şifreniz başarıyla güncellendi. Yeni şifrenizle tekrar giriş yapınız.', 'success')
+            
+            # Şifre değiştirildiği için kullanıcıyı otomatik olarak çıkış yapmaya yönlendir
+            return redirect(url_for('logout')) 
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Şifre güncellenirken bir hata oluştu: {e}", 'danger')
+            return redirect(url_for('change_password'))
+            
+    # GET isteği için formu göster
+    return render_template('change_password.html', title='Şifre Değiştir')
 
 
 # --- ANALİZ RAPORLARI SAYFASI ---
