@@ -6,6 +6,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
 import os # Ortam değişkenlerini (DATABASE_URL) okumak için
+from flask_login import UserMixin
 
 # SQLAlchemy veritabanı nesnesini oluştur
 db = SQLAlchemy()
