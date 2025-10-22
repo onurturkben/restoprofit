@@ -1,9 +1,9 @@
-# app.py (FAZ 5, AŞAMA 5: Logo Yönetimi + Hata Düzeltmeleri)
+# app.py (TÜM GÜNCELLEMELER DAHİL - TAM VE HATASIZ SÜRÜM)
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash
 from database import (
     db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
-    guncelle_tum_urun_maliyetleri, Ayarlar
+    guncelle_tum_urun_maliyetleri
 )
 import pandas as pd
 from datetime import datetime
@@ -13,19 +13,10 @@ from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 from sqlalchemy import func
-from werkzeug.utils import secure_filename
-import base64
 
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'renderda_bunu_kesin_degistirmelisiniz123')
-app.config['UPLOAD_FOLDER'] = 'static/uploads' # Logo için yükleme klasörü
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB limit
-
-# Klasörün varlığını kontrol et
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
-
 init_db(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
@@ -38,7 +29,7 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# --- İLK KULLANICIYI VE AYARLARI OLUŞTUR ---
+# --- İLK KULLANICIYI OLUŞTUR ---
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
@@ -47,27 +38,13 @@ with app.app_context():
         db.session.add(admin_user)
         db.session.commit()
         print("Güvenli kullanıcı oluşturuldu.")
-    if not Ayarlar.query.first():
-        print("Varsayılan ayarlar oluşturuluyor...")
-        default_settings = Ayarlar(site_adi="RestoProfit")
-        db.session.add(default_settings)
-        db.session.commit()
-        print("Ayarlar oluşturuldu.")
-
-
-# --- CONTEXT PROCESSOR ---
-# Tüm templatelerde ayarları kullanılabilir yap
-@app.context_processor
-def inject_settings():
-    settings = Ayarlar.query.first()
-    return dict(settings=settings)
 
 
 # --- GÜVENLİK SAYFALARI ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard')) 
+        return redirect(url_for('dashboard'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -80,7 +57,7 @@ def login():
     return render_template('login.html', title='Giriş Yap')
 
 @app.route('/logout')
-@login_required 
+@login_required
 def logout():
     logout_user()
     flash('Başarıyla çıkış yaptınız.', 'info')
@@ -93,7 +70,7 @@ def change_password():
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-        
+
         if not bcrypt.check_password_hash(current_user.password_hash, current_password):
             flash('Mevcut şifreniz hatalı.', 'danger')
             return redirect(url_for('change_password'))
@@ -121,9 +98,9 @@ def change_password():
     return render_template('change_password.html', title='Şifre Değiştir')
 
 
-# --- ANA SAYFA ---
+# --- ANA SAYFA (DASHBOARD) ---
 @app.route('/')
-@login_required 
+@login_required
 def dashboard():
     try:
         toplam_satis_kaydi = db.session.query(SatisKaydi).count()
@@ -139,7 +116,7 @@ def dashboard():
     return render_template('dashboard.html', title='Ana Ekran', summary=summary)
 
 
-# --- VERİ YÖNETİMİ ---
+# --- EXCEL YÜKLEME ---
 @app.route('/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -162,42 +139,41 @@ def upload_excel():
             
             urunler_db = Urun.query.all()
             urun_eslestirme_haritasi = {u.excel_adi: u.id for u in urunler_db}
+            urun_maliyet_haritasi = {u.id: u.hesaplanan_maliyet for u in urunler_db}
             
-            with app.app_context():
-                urun_maliyet_haritasi = {u.id: u.hesaplanan_maliyet for u in urunler_db}
-                yeni_kayit_listesi = []
-                taninmayan_urunler = set()
+            yeni_kayit_listesi = []
+            taninmayan_urunler = set()
+            
+            for index, satir in df.iterrows():
+                excel_urun_adi = satir['Urun_Adi']
+                adet = int(satir['Adet'])
+                toplam_tutar = float(satir['Toplam_Tutar'])
+                tarih = pd.to_datetime(satir['Tarih'])
                 
-                for index, satir in df.iterrows():
-                    excel_urun_adi = satir['Urun_Adi']
-                    adet = int(satir['Adet'])
-                    toplam_tutar = float(satir['Toplam_Tutar'])
-                    tarih = pd.to_datetime(satir['Tarih'])
-                    
-                    urun_id = urun_eslestirme_haritasi.get(excel_urun_adi)
-                    if not urun_id:
-                        taninmayan_urunler.add(excel_urun_adi)
-                        continue
-                    if adet == 0: continue
-                    
-                    o_anki_maliyet = urun_maliyet_haritasi.get(urun_id, 0)
-                    hesaplanan_toplam_maliyet = o_anki_maliyet * adet
-                    hesaplanan_kar = toplam_tutar - hesaplanan_toplam_maliyet
-                    
-                    yeni_kayit = SatisKaydi(
-                        urun_id=urun_id, tarih=tarih, adet=adet, toplam_tutar=toplam_tutar,
-                        hesaplanan_birim_fiyat=(toplam_tutar / adet),
-                        hesaplanan_maliyet=hesaplanan_toplam_maliyet,
-                        hesaplanan_kar=hesaplanan_kar
-                    )
-                    yeni_kayit_listesi.append(yeni_kayit)
+                urun_id = urun_eslestirme_haritasi.get(excel_urun_adi)
+                if not urun_id:
+                    taninmayan_urunler.add(excel_urun_adi)
+                    continue
+                if adet == 0: continue
                 
-                db.session.add_all(yeni_kayit_listesi)
-                db.session.commit()
+                o_anki_maliyet = urun_maliyet_haritasi.get(urun_id, 0)
+                hesaplanan_toplam_maliyet = o_anki_maliyet * adet
+                hesaplanan_kar = toplam_tutar - hesaplanan_toplam_maliyet
                 
-                flash(f'Başarılı! {len(yeni_kayit_listesi)} adet satış kaydı veritabanına işlendi.', 'success')
-                if taninmayan_urunler:
-                    flash(f"UYARI: Şu ürünler tanınmadı ve atlandı: {', '.join(taninmayan_urunler)}", 'warning')
+                yeni_kayit = SatisKaydi(
+                    urun_id=urun_id, tarih=tarih, adet=adet, toplam_tutar=toplam_tutar,
+                    hesaplanan_birim_fiyat=(toplam_tutar / adet),
+                    hesaplanan_maliyet=hesaplanan_toplam_maliyet,
+                    hesaplanan_kar=hesaplanan_kar
+                )
+                yeni_kayit_listesi.append(yeni_kayit)
+            
+            db.session.add_all(yeni_kayit_listesi)
+            db.session.commit()
+            
+            flash(f'Başarılı! {len(yeni_kayit_listesi)} adet satış kaydı veritabanına işlendi.', 'success')
+            if taninmayan_urunler:
+                flash(f"UYARI: Şu ürünler tanınmadı ve atlandı: {', '.join(taninmayan_urunler)}", 'warning')
 
         except ValueError as ve:
             flash(f"HATA OLUŞTU: {ve}", 'danger')
@@ -207,15 +183,19 @@ def upload_excel():
         
     return redirect(url_for('dashboard'))
 
-# --- YÖNETİM PANELİ (CRUD) ---
 
+# --- YÖNETİM PANELİ (Faz 5: CRUD) ---
 @app.route('/admin')
 @login_required
 def admin_panel():
     try:
+        # Formlardaki açılır menüleri doldurmak için bu listeleri çekiyoruz
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
+        
+        # Internal Server Error hatasını düzelten sorgu
         receteler = Recete.query.join(Urun).join(Hammadde).order_by(Urun.isim, Hammadde.isim).all()
+        
     except Exception as e:
         flash(f'Veritabanı hatası: {e}', 'danger')
         hammaddeler, urunler, receteler = [], [], []
@@ -237,12 +217,14 @@ def add_material():
         db.session.add(yeni_hammadde)
         db.session.commit()
         flash(f"Başarılı! '{isim}' hammaddesi eklendi.", 'success')
+    
     except IntegrityError: 
         db.session.rollback()
-        flash(f"HATA: '{isim}' adında bir hammadde zaten mevcut.", 'danger')
+        flash(f"HATA: '{isim}' adında bir hammadde zaten mevcut. Eklenemedi.", 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Hammadde eklenirken bir hata oluştu: {e}", 'danger')
+        
     return redirect(url_for('admin_panel'))
 
 
@@ -261,17 +243,20 @@ def add_product():
             excel_adi=excel_adi, 
             mevcut_satis_fiyati=fiyat, 
             kategori=kategori, 
-            kategori_grubu=grup
+            kategori_grubu=grup,
+            hesaplanan_maliyet=0
         )
         db.session.add(yeni_urun)
         db.session.commit()
         flash(f"Başarılı! '{isim}' ürünü eklendi. Şimdi reçetesini oluşturun.", 'success')
+    
     except IntegrityError:
         db.session.rollback()
         flash(f"HATA: '{isim}' adında bir ürün zaten mevcut.", 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Ürün eklenirken bir hata oluştu: {e}", 'danger')
+        
     return redirect(url_for('admin_panel'))
 
 @app.route('/add-recipe', methods=['POST'])
@@ -292,11 +277,16 @@ def add_recipe():
             flash("Başarılı! Reçete kalemi eklendi.", 'success')
         
         db.session.commit()
+        
+        # Reçete eklendiği anda, o ürünün toplam maliyetini GÜNCELLE
         guncelle_tum_urun_maliyetleri()
+        
     except Exception as e:
         db.session.rollback()
         flash(f"HATA: Reçete eklenirken bir hata oluştu: {e}", 'danger')
+        
     return redirect(url_for('admin_panel'))
+
 
 # --- VERİ YÖNETİMİ ---
 @app.route('/delete-sales-by-date', methods=['POST'])
@@ -363,6 +353,7 @@ def change_password():
             return redirect(url_for('change_password'))
             
     return render_template('change_password.html', title='Şifre Değiştir')
+
 
 # --- ANALİZ RAPORLARI SAYFASI ---
 @app.route('/reports', methods=['GET', 'POST'])
