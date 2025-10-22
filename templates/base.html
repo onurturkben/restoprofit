@@ -81,6 +81,27 @@
             font-size: 20px;
         }
 
+        /* NAV DÜZELTMELERİ (İkon Boyutu) */
+        .navbar-nav .nav-link {
+            /* Tüm Nav Linklerinin Metin Büyüklüğünü Bir Miktar Artırıyoruz */
+            font-size: 15px; 
+            font-weight: 500;
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        /* İkon hizalaması ve boyutu iyileştirmesi */
+        .nav-link .bi, .navbar-brand .bi {
+            vertical-align: -0.125em;
+            margin-right: var(--spacer-1); /* 8px */
+            /* İkon boyutunu büyütüyoruz (Önceki geri bildirim) */
+            font-size: 1.25rem; 
+        }
+        /* Kullanıcı dropdown ikonu için ekstra hizalama */
+        .dropdown-toggle .bi-person-circle {
+            vertical-align: -0.2em !important;
+        }
+
         /* Minimalist Kartlar */
         .card {
             border: none;
@@ -100,11 +121,6 @@
             font-size: 14px;
         }
         
-        /* İkon hizalaması */
-        .bi {
-            vertical-align: -0.125em;
-            margin-right: var(--spacer-1); /* 8px */
-        }
     </style>
     <title>RestoProfit Asistan - {{ title }}</title>
 
@@ -117,8 +133,8 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <!-- Kullanıcı Giriş Yaptıysa (current_user.is_authenticated) -->
+                <ul class="navbar-nav w-100">
+                    <!-- ANA NAVİGASYON (Sola Yakın) -->
                     {% if current_user.is_authenticated %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-house-door-fill"></i> Ana Ekran</a>
@@ -129,8 +145,9 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin_panel') }}"><i class="bi bi-gear-fill"></i> Menü Yönetimi</a>
                         </li>
-                        <!-- Kullanıcı Dropdown Menüsü (YENİ KISIM) -->
-                        <li class="nav-item dropdown">
+                        <!-- KULLANICI DROPDOWN MENÜSÜ (EN SAĞA İTİLDİ) -->
+                        <!-- ms-auto: Bu öğeyi ve sonrasını en sağa iter -->
+                        <li class="nav-item dropdown ms-auto">
                             <!-- Kullanıcı Adı (current_user.username) ile Açılır Menüyü Açan Buton -->
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle"></i> {{ current_user.username }}
@@ -145,7 +162,8 @@
                         </li>
                     {% else %}
                         <!-- Kullanıcı Giriş Yapmadıysa (Sadece Giriş Linki) -->
-                        <li class="nav-item">
+                        <!-- w-100 içerisindeki ms-auto, bu linki en sağa iter -->
+                        <li class="nav-item ms-auto">
                             <a class="nav-link" href="{{ url_for('login') }}"><i class="bi bi-box-arrow-in-right"></i> Giriş Yap</a>
                         </li>
                     {% endif %}
