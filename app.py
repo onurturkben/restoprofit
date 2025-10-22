@@ -1,5 +1,6 @@
+# app.py (FAZ 5, AŞAMA 2: GERÇEK CRUD YÖNETİM PANELİ - DÜZELTİLMİŞ)
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash
 from database import (
     db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
     guncelle_tum_urun_maliyetleri
@@ -12,9 +13,6 @@ from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 from sqlalchemy import func
-from werkzeug.utils import secure_filename
-import base64
-import json  # Chart.js için json'a ihtiyacımız olacak
 
 # --- Analiz Motorlarını "Beyinden" İçe Aktar ---
 from analysis_engine import (
@@ -27,10 +25,12 @@ from analysis_engine import (
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'renderda_bunu_kesin_degistirmelisiniz123')
+# 'static/uploads' klasörünü oluştur (logo vb. için ileride gerekebilir)
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# Veritabanını başlat
 init_db(app)
-
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -39,42 +39,28 @@ login_manager.login_message_category = "warning"
 
 @login_manager.user_loader
 def load_user(user_id):
-    # Veritabanı başlatılmadan önce bu çağrılabilir, bu yüzden try-except ekliyoruz
-    try:
-        return User.query.get(int(user_id))
-    except Exception as e:
-        print(f"Error loading user: {e}")
-        return None
+    return User.query.get(int(user_id))
 
-
-# --- İLK KULLANICIYI VE AYARLARI OLUŞTUR ---
+# --- İLK KULLANICIYI OLUŞTUR ---
 with app.app_context():
-    db.create_all() # Tabloların var olduğundan emin ol
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
+        # Lütfen bu şifreyi ilk girişten sonra hemen değiştirin!
         hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
         admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
         db.session.commit()
         print("Güvenli kullanıcı oluşturuldu.")
-    if not Ayarlar.query.first():
-        print("Varsayılan ayarlar oluşturuluyor...")
-        # Varsayılan logo olarak boş bir string veya yerel bir yol (eğer varsa)
-        default_settings = Ayarlar(site_adi="RestoProfit", logo_url=None)
-        db.session.add(default_settings)
-        db.session.commit()
-        print("Ayarlar oluşturuldu.")
-
 
 # --- CONTEXT PROCESSOR ---
-# Tüm templatelerde ayarları (site adı, logo) kullanılabilir yap
+# Tüm templatelerde ayarları (site adı) kullanılabilir yap
 @app.context_processor
 def inject_settings():
-    settings = Ayarlar.query.first()
-    return dict(settings=settings)
+    # Şimdilik site adını sabit olarak gönderiyoruz
+    # İleride Logo Yükleme eklersek burayı kullanacağız
+    return dict(site_name="RestoProfit")
 
-
-# --- GÜVENLİK VE KULLANICI SAYFALARI ---
+# --- GÜVENLİK SAYFALARI ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -150,7 +136,7 @@ def dashboard():
     return render_template('dashboard.html', title='Ana Ekran', summary=summary)
 
 
-# --- EXCEL YÜKLEME ---
+# --- VERİ YÖNETİMİ ---
 @app.route('/upload-excel', methods=['POST'])
 @login_required
 def upload_excel():
@@ -198,7 +184,7 @@ def upload_excel():
                     yeni_kayit = SatisKaydi(
                         urun_id=urun_id, tarih=tarih, adet=adet, toplam_tutar=toplam_tutar,
                         hesaplanan_birim_fiyat=(toplam_tutar / adet),
-                        hesaplanan_maliyet=hesaplanan_toplam_maliyet,
+                        hesaplanan_maliyet=hesaplanan_toplam_taliyet,
                         hesaplanan_kar=hesaplanan_kar
                     )
                     yeni_kayit_listesi.append(yeni_kayit)
@@ -218,15 +204,15 @@ def upload_excel():
         
     return redirect(url_for('dashboard'))
 
-
 # --- YÖNETİM PANELİ (CRUD) ---
+
 @app.route('/admin')
 @login_required
 def admin_panel():
     try:
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
-        # Düzeltilmiş sorgu:
+        # Düzeltilmiş sorgu (join(Hammadde) eklendi):
         receteler = Recete.query.join(Urun, Urun.id == Recete.urun_id)\
                                 .join(Hammadde, Hammadde.id == Recete.hammadde_id)\
                                 .order_by(Urun.isim, Hammadde.isim).all()
@@ -361,7 +347,7 @@ def delete_product(id):
     try:
         urun = db.session.get(Urun, id)
         if urun:
-            # Önce bu ürünle ilişkili satış kayıtlarını ve reçeteleri sil
+            # İlişkili satış kayıtlarını ve reçeteleri de sil
             SatisKaydi.query.filter_by(urun_id=id).delete()
             Recete.query.filter_by(urun_id=id).delete()
             db.session.delete(urun)
@@ -490,15 +476,21 @@ def change_password():
 @app.route('/reports', methods=['GET', 'POST'])
 @login_required
 def reports():
+    # Bu listeler formları doldurmak için gerekli
     try:
         urunler_db = Urun.query.all()
         urun_listesi = [u.isim for u in urunler_db]
-        kategori_listesi = sorted(list(set([u.kategori for u in urunler_db if u.kategori])))
-        grup_listesi = sorted(list(set([u.kategori_grubu for u in urunler_db if u.kategori_grubu])))
+        
+        kategoriler_db = db.session.query(Urun.kategori).distinct().all()
+        kategori_listesi = sorted([k[0] for k in kategoriler_db if k[0]])
+        
+        gruplar_db = db.session.query(Urun.kategori_grubu).distinct().all()
+        grup_listesi = sorted([g[0] for g in gruplar_db if g[0]])
     except Exception as e:
         flash(f'Veritabanından listeler çekilirken hata oluştu: {e}', 'danger')
         urun_listesi, kategori_listesi, grup_listesi = [], [], []
 
+    
     analiz_sonucu = None
     chart_data = None 
     
@@ -524,7 +516,7 @@ def reports():
                 urun_ismi = request.form.get('urun_ismi')
                 success, sonuc, chart_data_json = bul_optimum_fiyat(urun_ismi)
                 analiz_sonucu = sonuc
-                chart_data = chart_data_json # Grafiği şablona gönder
+                chart_data = chart_data_json # Grafiği şablona yolla
                 if not success: flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'kategori':
@@ -555,7 +547,7 @@ def reports():
                            kategori_listesi=kategori_listesi,
                            grup_listesi=grup_listesi,
                            analiz_sonucu=analiz_sonucu,
-                           chart_data=chart_data) # chart_data'yı şablona yolla
+                           chart_data=chart_data)
 
 # Render.com'un uygulamayı çalıştırması için
 if __name__ == '__main__':
