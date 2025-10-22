@@ -1,26 +1,34 @@
-# app.py (TÜM GÜNCELLEMELER DAHİL - CRUD + Veri Yönetimi)
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from database import (
-    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User
+    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
+    guncelle_tum_urun_maliyetleri
 )
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 import pandas as pd
 from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-import warnings
-from sklearn.linear_model import LinearRegression
-import numpy as np
+from sqlalchemy import func
+from werkzeug.utils import secure_filename
+import base64
+import json  # Chart.js için json'a ihtiyacımız olacak
+
+# --- Analiz Motorlarını "Beyinden" İçe Aktar ---
+from analysis_engine import (
+    hesapla_hedef_marj,
+    simule_et_fiyat_degisikligi,
+    bul_optimum_fiyat,
+    analiz_et_kategori_veya_grup
+)
 
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'renderda_bunu_kesin_degistirmelisiniz123')
 
-# Veritabanı bağlantısı
+# Veritabanını başlat
 init_db(app)
 
 bcrypt = Bcrypt(app)
@@ -31,10 +39,17 @@ login_manager.login_message_category = "warning"
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    # Veritabanı başlatılmadan önce bu çağrılabilir, bu yüzden try-except ekliyoruz
+    try:
+        return User.query.get(int(user_id))
+    except Exception as e:
+        print(f"Error loading user: {e}")
+        return None
 
-# --- İLK KULLANICIYI OLUŞTUR ---
+
+# --- İLK KULLANICIYI VE AYARLARI OLUŞTUR ---
 with app.app_context():
+    db.create_all() # Tabloların var olduğundan emin ol
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
         hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
@@ -42,28 +57,24 @@ with app.app_context():
         db.session.add(admin_user)
         db.session.commit()
         print("Güvenli kullanıcı oluşturuldu.")
-
-# --- YÖNETİM FONKSİYONLARI (Maliyet Hesaplama) ---
-def guncelle_tum_urun_maliyetleri():
-    """Tüm ürünlerin maliyetlerini reçetelere göre günceller."""
-    try:
-        urunler = Urun.query.all()
-        for urun in urunler:
-            toplam_maliyet = 0.0
-            receteler = Recete.query.filter_by(urun_id=urun.id).all()
-            for recete_kalemi in receteler:
-                if recete_kalemi.hammadde:
-                    toplam_maliyet += recete_kalemi.miktar * recete_kalemi.hammadde.maliyet_fiyati
-            urun.hesaplanan_maliyet = toplam_maliyet
+    if not Ayarlar.query.first():
+        print("Varsayılan ayarlar oluşturuluyor...")
+        # Varsayılan logo olarak boş bir string veya yerel bir yol (eğer varsa)
+        default_settings = Ayarlar(site_adi="RestoProfit", logo_url=None)
+        db.session.add(default_settings)
         db.session.commit()
-        print("Tüm ürün maliyetleri yeniden hesaplandı.")
-        return True
-    except Exception as e:
-        db.session.rollback()
-        print(f"Maliyet güncelleme hatası: {e}")
-        return False
+        print("Ayarlar oluşturuldu.")
 
-# --- GÜVENLİK SAYFALARI ---
+
+# --- CONTEXT PROCESSOR ---
+# Tüm templatelerde ayarları (site adı, logo) kullanılabilir yap
+@app.context_processor
+def inject_settings():
+    settings = Ayarlar.query.first()
+    return dict(settings=settings)
+
+
+# --- GÜVENLİK VE KULLANICI SAYFALARI ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -215,7 +226,10 @@ def admin_panel():
     try:
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
-        receteler = Recete.query.join(Urun).join(Hammadde).order_by(Urun.isim, Hammadde.isim).all()
+        # Düzeltilmiş sorgu:
+        receteler = Recete.query.join(Urun, Urun.id == Recete.urun_id)\
+                                .join(Hammadde, Hammadde.id == Recete.hammadde_id)\
+                                .order_by(Urun.isim, Hammadde.isim).all()
     except Exception as e:
         flash(f'Veritabanı hatası: {e}', 'danger')
         hammaddeler, urunler, receteler = [], [], []
@@ -261,7 +275,7 @@ def edit_material(id):
         hammadde.maliyet_birimi = request.form.get('birim')
         hammadde.maliyet_fiyati = float(request.form.get('fiyat'))
         db.session.commit()
-        guncelle_tum_urun_maliyetleri()
+        guncelle_tum_urun_maliyetleri() # Fiyat değiştiği için maliyetleri yeniden hesapla
         flash(f"'{hammadde.isim}' güncellendi.", 'success')
     except Exception as e:
         db.session.rollback()
@@ -274,12 +288,9 @@ def delete_material(id):
     try:
         hammadde = db.session.get(Hammadde, id)
         if hammadde:
-            # Reçetelerde kullanılıp kullanılmadığını kontrol et
-            in_recipe = Recete.query.filter_by(hammadde_id=id).first()
-            if in_recipe:
+            if hammadde.receteler:
                 flash(f"HATA: '{hammadde.isim}' bir veya daha fazla reçetede kullanıldığı için silinemez.", 'danger')
                 return redirect(url_for('admin_panel'))
-                
             db.session.delete(hammadde)
             db.session.commit()
             flash(f"'{hammadde.isim}' silindi.", 'success')
@@ -337,10 +348,7 @@ def edit_product(id):
         urun.kategori = request.form.get('kategori')
         urun.kategori_grubu = request.form.get('grup')
         db.session.commit()
-        
-        # Ürün fiyatı değişti, maliyetleri de yeniden hesaplayalım (maliyet değişmese bile kar marjı değişir)
-        guncelle_tum_urun_maliyetleri()
-        
+        guncelle_tum_urun_maliyetleri() # Fiyat değişmiş olabileceğinden maliyetleri güncelle
         flash(f"'{urun.isim}' güncellendi.", 'success')
     except Exception as e:
         db.session.rollback()
@@ -353,12 +361,12 @@ def delete_product(id):
     try:
         urun = db.session.get(Urun, id)
         if urun:
-            # İlişkili satış kayıtlarını ve reçeteleri de sil
+            # Önce bu ürünle ilişkili satış kayıtlarını ve reçeteleri sil
             SatisKaydi.query.filter_by(urun_id=id).delete()
             Recete.query.filter_by(urun_id=id).delete()
             db.session.delete(urun)
             db.session.commit()
-            flash(f"'{urun.isim}' ürünü ve ilgili tüm veriler silindi.", 'success')
+            flash(f"'{urun.isim}' ürünü ve ilgili tüm kayıtlar silindi.", 'success')
         else:
             flash("Ürün bulunamadı.", 'warning')
     except Exception as e:
@@ -385,7 +393,7 @@ def add_recipe():
             flash("Başarılı! Reçete kalemi eklendi.", 'success')
         
         db.session.commit()
-        guncelle_tum_urun_maliyetleri()
+        guncelle_tum_urun_maliyetleri() # Maliyeti hemen güncelle
         
     except Exception as e:
         db.session.rollback()
@@ -401,7 +409,7 @@ def delete_recipe(id):
         if recete_item:
             db.session.delete(recete_item)
             db.session.commit()
-            guncelle_tum_urun_maliyetleri()
+            guncelle_tum_urun_maliyetleri() # Maliyeti yeniden güncelle
             flash("Reçete kalemi silindi.", 'success')
         else:
             flash("Reçete kalemi bulunamadı.", 'warning')
@@ -483,22 +491,14 @@ def change_password():
 @login_required
 def reports():
     try:
-        urunler = Urun.query.order_by(Urun.isim).all()
-        urun_listesi = [u.isim for u in urunler]
-        
-        kategoriler_db = db.session.query(Urun.kategori).distinct().all()
-        kategori_listesi = sorted([k[0] for k in kategoriler_db if k[0]])
-        
-        gruplar_db = db.session.query(Urun.kategori_grubu).distinct().all()
-        grup_listesi = sorted([g[0] for g in gruplar_db if g[0]])
-        
+        urunler_db = Urun.query.all()
+        urun_listesi = [u.isim for u in urunler_db]
+        kategori_listesi = sorted(list(set([u.kategori for u in urunler_db if u.kategori])))
+        grup_listesi = sorted(list(set([u.kategori_grubu for u in urunler_db if u.kategori_grubu])))
     except Exception as e:
         flash(f'Veritabanından listeler çekilirken hata oluştu: {e}', 'danger')
-        urun_listesi = []
-        kategori_listesi = []
-        grup_listesi = []
+        urun_listesi, kategori_listesi, grup_listesi = [], [], []
 
-    
     analiz_sonucu = None
     chart_data = None 
     
@@ -511,28 +511,21 @@ def reports():
                 hedef_marj = float(request.form.get('hedef_marj'))
                 success, sonuc = hesapla_hedef_marj(urun_ismi, hedef_marj)
                 analiz_sonucu = sonuc
-                if not success:
-                    flash(sonuc, 'danger')
+                if not success: flash(sonuc, 'danger')
             
             elif analiz_tipi == 'simulasyon':
                 urun_ismi = request.form.get('urun_ismi')
                 yeni_fiyat = float(request.form.get('yeni_fiyat'))
                 success, sonuc = simule_et_fiyat_degisikligi(urun_ismi, yeni_fiyat)
                 analiz_sonucu = sonuc
-                if not success:
-                    flash(sonuc, 'danger')
+                if not success: flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'optimum_fiyat':
                 urun_ismi = request.form.get('urun_ismi')
-                # Modelin hem metin raporunu hem de grafik verisini döndürmesi için güncellenmesi gerekiyor
-                # Şimdilik, analysis_engine.py'nin buna göre güncellendiğini varsayıyoruz
-                # GÜNCELLEME: analysis_engine.py'yi chart_data döndürecek şekilde değiştirmemiz gerekecek.
-                # Şimdilik sadece metni alıyoruz.
                 success, sonuc, chart_data_json = bul_optimum_fiyat(urun_ismi)
                 analiz_sonucu = sonuc
                 chart_data = chart_data_json # Grafiği şablona gönder
-                if not success:
-                    flash(sonuc, 'danger')
+                if not success: flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'kategori':
                 kategori_ismi = request.form.get('kategori_ismi')
@@ -540,8 +533,7 @@ def reports():
                 success, sonuc, chart_data_json = analiz_et_kategori_veya_grup('kategori', kategori_ismi, gun_sayisi)
                 analiz_sonucu = sonuc
                 chart_data = chart_data_json
-                if not success:
-                    flash(sonuc, 'danger')
+                if not success: flash(sonuc, 'danger')
                 
             elif analiz_tipi == 'grup':
                 grup_ismi = request.form.get('grup_ismi')
@@ -549,11 +541,11 @@ def reports():
                 success, sonuc, chart_data_json = analiz_et_kategori_veya_grup('kategori_grubu', grup_ismi, gun_sayisi)
                 analiz_sonucu = sonuc
                 chart_data = chart_data_json
-                if not success:
-                    flash(sonuc, 'danger')
+                if not success: flash(sonuc, 'danger')
             
             else:
-                flash("Geçersiz analiz tipi seçildi.", "warning")
+                success, sonuc = False, "Geçersiz analiz tipi."
+                flash(sonuc, 'warning')
 
         except Exception as e:
             flash(f"Analiz sırasında bir hata oluştu: {e}", 'danger')
@@ -563,8 +555,7 @@ def reports():
                            kategori_listesi=kategori_listesi,
                            grup_listesi=grup_listesi,
                            analiz_sonucu=analiz_sonucu,
-                           chart_data=chart_data)
-
+                           chart_data=chart_data) # chart_data'yı şablona yolla
 
 # Render.com'un uygulamayı çalıştırması için
 if __name__ == '__main__':
