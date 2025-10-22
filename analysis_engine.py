@@ -1,5 +1,6 @@
-# analysis_engine.py (DÜZELTİLMİŞ VERSİYON 2 - ImportError için)
+# analysis_engine.py
 # Bu dosya, Colab'de yazdığımız TÜM analiz motorlarını içerir.
+# Veritabanıyla konuşmak için 'database.py' dosyalarındaki modelleri kullanır.
 
 import pandas as pd
 import numpy as np
@@ -8,9 +9,14 @@ from datetime import datetime, timedelta
 from database import db, Urun, SatisKaydi
 import warnings
 
-# --- Motor 1 (Colab Hücre 9): Hedef Marj Hesaplayıcı ---
+# --- Motor 1: Hedef Marj Hesaplayıcı ---
 
 def hesapla_hedef_marj(urun_ismi, hedef_marj_yuzdesi):
+    """
+    Veritabanından ürünün maliyetini çeker ve kullanıcının
+    istediği hedef kar marjına ulaşmak için gereken
+    satış fiyatını hesaplar.
+    """
     try:
         urun = Urun.query.filter_by(isim=urun_ismi).first()
         if not urun:
@@ -21,7 +27,7 @@ def hesapla_hedef_marj(urun_ismi, hedef_marj_yuzdesi):
             return False, f"HATA: '{urun_ismi}' ürününün maliyeti 0 TL veya negatif. Lütfen önce maliyetleri güncelleyin."
         
         if not (0 < hedef_marj_yuzdesi < 100):
-            return False, "HATA: Hedef Marj Yüzdesi 0 ile 100 arasında olmalıdır."
+            return False, "HATA: Hedef Marj Yüzdesi 0 ile 100 arasında bir sayı olmalıdır."
 
         marj_orani = hedef_marj_yuzdesi / 100.0
         gereken_satis_fiyati = maliyet / (1 - marj_orani)
@@ -39,7 +45,7 @@ def hesapla_hedef_marj(urun_ismi, hedef_marj_yuzdesi):
         return False, f"Hesaplama hatası: {e}"
 
 
-# --- Motor 2 (Colab Hücre 7): Fiyat Simülatörü ---
+# --- Motor 2: Fiyat Simülatörü ---
 
 def _get_daily_sales_data(urun_id):
     """Yardımcı fonksiyon: Analiz için günlük satış verisini çeker."""
@@ -180,6 +186,7 @@ def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
                 return False, "HATA: Hiçbir sonuç hesaplanamadı."
 
             df_sonuclar = pd.DataFrame(sonuclar)
+            
             optimum = df_sonuclar.loc[df_sonuclar['tahmini_kar'].idxmax()]
             
             mevcut_gunluk_satis_df = df_gunluk[df_gunluk['ortalama_fiyat'].round() == round(mevcut_fiyat)]
@@ -205,7 +212,7 @@ def bul_optimum_fiyat(urun_ismi, fiyat_deneme_araligi=1.0):
             return False, f"Optimizasyon hatası: {e}"
 
 
-# --- Motor 4 & 5 (Colab Hücre 10 & 11) - BİRLEŞTİRİLDİ ---
+# --- Motor 4 & 5 (Colab Hücre 10 & 11): Kategori ve Grup Analizi ---
 
 def _get_sales_by_filter(field, value):
     """Yardımcı fonksiyon: Kategori veya Gruba göre satışları çeker."""
@@ -220,6 +227,7 @@ def _get_sales_by_filter(field, value):
     if not satislar:
         return None
 
+    # İlişkili verileri çekmek için optimize edilmiş sorgu
     df_data = []
     for s in satislar:
         df_data.append({
@@ -248,22 +256,19 @@ def _hesapla_kategori_ozeti(df_periyot, grup_kolonu):
         'paylar': paylar.to_dict()
     }
 
-# --- HATA BURADAYDI: İki fonksiyonu app.py'nin beklediği tek fonksiyonda birleştirdim ---
 def analiz_et_kategori_veya_grup(tip, isim, gun_sayisi=7):
     """
     Hem Kategori (Hücre 10) hem de Kategori Grubu (Hücre 11) analizini
-    yapabilen birleşik fonksiyon. (DÜZELTİLMİŞ)
-    tip: 'kategori' veya 'kategori_grubu'
-    isim: 'Burgerler' veya 'Ana Yemekler'
+    yapabilen birleşik fonksiyon.
     """
     try:
         if tip == 'kategori':
             df_satislar = _get_sales_by_filter('kategori', isim)
-            grup_kolonu = 'isim' # Kategori analizi, içindeki ÜRÜNLERİN payına bakar
+            grup_kolonu = 'isim' 
             baslik = f"STRATEJİST ASİSTAN (FAZ 3): '{isim}' KATEGORİ ANALİZİ"
         elif tip == 'kategori_grubu':
             df_satislar = _get_sales_by_filter('kategori_grubu', isim)
-            grup_kolonu = 'kategori' # Grup analizi, içindeki KATEGORİLERİN payına bakar
+            grup_kolonu = 'kategori' 
             baslik = f"GENEL STRATEJİST (FAZ 4): '{isim}' GRUP ANALİZİ"
         else:
             return False, "HATA: Geçersiz analiz tipi."
@@ -322,3 +327,4 @@ def analiz_et_kategori_veya_grup(tip, isim, gun_sayisi=7):
 
     except Exception as e:
         return False, f"Stratejik analiz hatası: {e}"
+
