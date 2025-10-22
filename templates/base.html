@@ -4,18 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Bootstrap İkonları -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <!-- === "Az Çoktur" Tasarım Stilleri === -->
-    
-    <!-- 1. Fontlar: Poppins ve Vollkorn -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Vollkorn:wght@600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&family=Vollkorn:wght@600&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -33,104 +27,133 @@
             font-size: 16px;
             font-weight: 400; /* Regular */
             line-height: 1.6;
-            color: #3d3d3d;
+            color: #333;
         }
         
-        /* Tipografi Hiyerarşisi */
-        h1, .h1 {
+        h1, .h1, h2, .h2 {
             font-family: 'Vollkorn', serif;
-            font-size: 2.5rem; 
             font-weight: 600;
             color: #1a202c;
-            margin-bottom: var(--spacer-3);
         }
-        h2, .h2 {
-            font-family: 'Vollkorn', serif;
-            font-size: 2rem;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: var(--spacer-2);
-        }
+        h1, .h1 { font-size: 40px; }
+        h2, .h2 { font-size: 32px; }
         h3, .h3 {
-            font-size: 1.5rem;
-            font-weight: 500;
-            font-family: 'Poppins', sans-serif;
-            color: #4a5568;
+            font-size: 24px;
+            font-weight: 500; /* Medium */
         }
-        
+        p, label, .form-text {
+            font-size: 16px;
+            font-weight: 400; /* Regular */
+            line-height: 1.6;
+        }
+
         .btn {
             font-weight: 500;
-            border-radius: 8px;
-            padding: 0.6rem 1.5rem;
         }
 
         .container {
             max-width: 1140px;
         }
 
-        /* Minimalist Navbar */
         .navbar {
             background-color: #ffffff !important;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #eee;
         }
         .navbar-brand {
             font-family: 'Poppins', sans-serif;
             font-weight: 700; /* Bold */
             font-size: 20px;
-            display: flex;
-            align-items: center;
-        }
-        .navbar-brand img {
-            height: 30px;
-            margin-right: 10px;
-        }
-        
-        .navbar-nav .nav-link {
-            font-weight: 500;
-            font-size: 1rem; /* Yazı boyutunu biraz büyüttük */
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-        .nav-link .bi {
-             font-size: 1.1rem;
-             margin-right: 0.5rem;
-             vertical-align: -0.1em;
-        }
-        .dropdown-toggle .bi-person-circle {
-            font-size: 1.4rem;
-        }
-        .dropdown-toggle::after {
-            display: none;
-        }
-        
-        .card {
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-            background-color: #ffffff;
         }
 
-        pre {
-            background-color: #f7fafc;
-            border: 1px solid #e2e8f0;
+        .card {
+            border: none;
             border-radius: 8px;
-            padding: 24px;
-            font-family: 'Menlo', 'Monaco', 'Consolas', "Courier New", monospace;
+            box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+        }
+        
+        pre {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: var(--spacer-3);
+            font-family: monospace;
             white-space: pre-wrap;
             word-wrap: break-word;
             font-size: 14px;
-            color: #2d3748;
         }
         
         .bi {
             vertical-align: -0.125em;
-            margin-right: 8px;
+            margin-right: var(--spacer-1);
+        }
+        .dropdown-toggle::after {
+            display: none;
         }
     </style>
+    
     <title>RestoProfit Asistan - {{ title }}</title>
+
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-5">
         <div class="container">
             <a class="navbar-brand text-dark" href="{{ url_for('dashboard') }}">
-                <img src="data:image/png;base64,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qCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqCqC an/na-yax/755/eab7/8/wD83z/4H/7r/Vf/AP/aAAwDAQACEQMRAD8A6Q7b9S0hR9pBIdD8ryg87geuM8fSq0c0b3C2mowS6XfyfcgvRtDnsI5fuyexyrdB2qG5sbe8XbPCkg7EjketZ0vh63J8yWzvbi0u51AM8J35P+0jh0f8A4ECgDK+Jfg+Lxh4L1S0Cjz4omubSQD5o54xuQj15G0/7LGvkj/ghr/yV7xl/2Cp/6UxV9r6d4q1j4cX8Wi+O5Hv8Aw9M4j0/xYyhTCTwkN8FAVD0CTKAmcDap5b4p/wCCG3/JV/GX/YKuf/SmGv0vwtzyOZYSpg6/x0df8UXpf+Vprvfqfk/jjwhiOHM9wudYCLeHre8u6qK7j/ihZvt7ttdD/QxXoKWkbvQpa+GP38KKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD5C/wCCyH/KOn4n/wDYPsv/AEutK+Fv+CG/wjyPi78QL+bT7fUY9H0WOKOG8iWWJZJpDuLKwIOBEy/jX3T/AMFl14/Z0/E/n3/sH2fP4f418p/8ENv+Sr+Mv+wVP/SmGuin8B+gVtcJ/wBdD7x/wCEXsP+hY8P/wDgti/+Io/4Rew/6Fjw/wD+C2L/AOIrVorxnOb3Z+gexpfyx+5f5HO/8IvYf9Cx4f8A/BbF/wDEUf8ACL2H/QseH/8AwWxf/EV0VFGc+4expey+5f5HM6toqWtpLNa6Hp8E8aFkkS1SRlIGQQwQEEHsRX5Gf8EsbOG8/a/1KOaGKaM+HrwlJFVlP7/T+x9a/Z2vzH/4JY/8na6l/wBi7ef+j9OruwTbrI8biClTWEk4pLU/SD/hF7D/AKFjw/8A+C2L/wCIo/4Rew/6Fjw//wCC2L/4iuitb+2vgxtbiO4CMUYxOGAYdQcd6nrzuZ9z6P2NP+Vfcjnf+EXsP+hY8P8A/gti/wDiKP8AhF7D/oWPD/8A4LYv/iK6KijOfcPY0v5V9yOfk0K1eNlTQdF8wg7S9pGFz2zhSceuAfrX5Ffs32FtL/wUY8eW8tnay28N7rqxwvAhSNQuAqkDCgdgOldT+0f/AMFAP2gPgf8AtHeOvBOk6t4Xl0nQNfvdMsHutFDSSQxTssaO/mDc20DnHUda8z/YF+IXjH4k/t8W3ibx3f22oeIL7QtRku7i1tltowVjwoWNScALgcc8V9rlNOvTxNNVE1G6bV9NNe3U/EeOMLldfhrFzwdKEqtqnCLs5K6dr6vbzP2c0O3gt7T/AEeCGH5jny0C9/atCs/RP+PX/gRrQr58+3CiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAPkH/AILKHH7On4nf9g+z/wDS61r5T/4Ib/8AJV/GX/YKuf8A0pir6r/4LLDP7On4mD/oH2f/AKXWtfKX/BDf/kq/jL/sFT/9KYK6YfAYVf4E/wDGj9S6KKK8A+9CiiigAr8x/wDglj/ydrqX/Yu3n/o/Tr9OK/Mf/glj/wAna6l/2Lt5/wCj9Ou3Afx4/wBdDyOJP9xn8v1P0F+E3/H5rP8A10g/9BauyrjfhN/x+az/ANdIP/QWrsq88+oQUUUUDCiiigD4n/aY/wCCQvwx+O/xC1XxhoOt6z8NfEWtTtc6idMVLiwmncks5t3wUJOWO1wMkkjmvW/2X/2JvhJ+yRpbReANEGr65NH5V54m1cLPqMwPVQ+AsanJysYXPPUnmvZaK3WIqKCgnojpnj8ZOnGm6srRWivovRdAooooOUKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD4f8A+CzP/Jt/hv8A7GWL/wBIrmvlP/ghv/yVfxl/2Cp/+lMVfVn/AAWZ/wCTb/Df/Yyx/wDpFc18p/8ABDb/AJKv4y/7BU//AKUwV1Q+Axq/wJ/40fqXRRRXgH3gUUUUAFfmP/wSy/5O11L/ALF28/8AR+nX6cV+Y/8AwSy/5O11L/sXbz/0fp124D+PH+uh5HE/++s/l+p+gvwl/wCP3V/+ukH/AKC1dnXGfCX/AI/dX/66Qf8AoLV2deefUoKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA+H/APgsz/ybf4b/AOxliz+EFzXyl/wQ3/5Kv4y/7BU//SmKvrX/AILL6feah+zJ4Za0t5rgJ4lhZ/LQuVDWtyATjpyQPxr5X/4IcxTRfFvx0ZInQHSJgCykA/v4uM19zhP91l/if5H4/n/APyW9P8A68/mfqpRRRXzp+qBRRRQAV+Y/wDwSy/5O11L/sXbz/0fp1+nFfmV/wAE
+                <i class="bi bi-graph-up-arrow"></i> RestoProfit
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav w-100">
+                    <!-- Kullanıcı Giriş Yaptıysa -->
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-house-door-fill"></i> Ana Ekran</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('reports') }}"><i class="bi bi-robot"></i> Analiz Motorları</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin_panel') }}"><i class="bi bi-gear-fill"></i> Menü Yönetimi</a>
+                        </li>
+
+                        <!-- Kullanıcı Dropdown Menüsü (En Sağa İtildi) -->
+                        <li class="nav-item dropdown ms-auto">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle"></i> {{ current_user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li><a class="dropdown-item" href="{{ url_for('change_password') }}"><i class="bi bi-key-fill"></i> Şifre Değiştir</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <!-- Kullanıcı Giriş Yapmadıysa -->
+                        <li class="nav-item ms-auto">
+                            <a class="nav-link" href="{{ url_for('login') }}"><i class="bi bi-box-arrow-in-right"></i> Giriş Yap</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <main class="container mb-5">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
