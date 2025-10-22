@@ -1,16 +1,16 @@
-# app.py (FAZ 5: GÜVENLİK VE CRUD TEMELİ - DÜZELTİLMİŞ)
+# app.py (FAZ 5, AŞAMA 2: GERÇEK CRUD YÖNETİM PANELİ)
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from database import (
-    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User, # User eklendi
-    menuyu_sifirla_ve_kur
+    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
+    guncelle_tum_urun_maliyetleri # Sadece maliyet güncellemeyi import ediyoruz
 )
 import pandas as pd
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
-from flask_bcrypt import Bcrypt # Güvenli şifreleme için eklendi
+from flask_bcrypt import Bcrypt
 from flask_login import (
-    LoginManager, login_user, logout_user, login_required, current_user # Giriş sistemi eklendi
+    LoginManager, login_user, logout_user, login_required, current_user
 )
 
 # --- Analiz Motorlarını "Beyinden" İçe Aktar ---
@@ -24,42 +24,35 @@ from analysis_engine import (
 # --- UYGULAMA KURULUMU ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'renderda_bunu_kesin_degistirmelisiniz123')
-
-# Veritabanını başlat
 init_db(app)
-
-# Güvenlik eklentilerini başlat
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-login_manager.login_view = 'login' # Kullanıcı giriş yapmamışsa, onu 'login' sayfasına yönlendir
+login_manager.login_view = 'login'
 login_manager.login_message = "Lütfen devam etmek için giriş yapın."
 login_manager.login_message_category = "warning"
 
 @login_manager.user_loader
 def load_user(user_id):
-    """ Flask-Login'in kullanıcıyı oturumdan tanımasını sağlar """
     return User.query.get(int(user_id))
 
 
-# --- İLK KULLANICIYI OLUŞTUR (Sadece bir kez çalışır) ---
-# Bu, "admin" / "12345" olarak ilk kullanıcınızı oluşturur.
-# Girdikten sonra mutlaka şifrenizi değiştirmelisiniz!
-# (Bu, Faz 5'in bir sonraki adımı olacak)
+# --- İLK KULLANICIYI OLUŞTUR (Bir önceki adımdan) ---
 with app.app_context():
     if not User.query.first():
         print("İlk admin kullanıcısı oluşturuluyor...")
-        hashed_password = bcrypt.generate_password_hash("1234").decode('utf-8')
+        # (Burada sizin bir önceki adımda yazdığınız güvenli şifreniz olmalı)
+        hashed_password = bcrypt.generate_password_hash("RestoranSifrem!2025").decode('utf-8')
         admin_user = User(username="onur", password_hash=hashed_password)
         db.session.add(admin_user)
         db.session.commit()
-        print("Kullanıcı 'admin', şifre '12345' olarak oluşturuldu.")
+        print("Güvenli kullanıcı oluşturuldu.")
 
 # --- GÜVENLİK SAYFALARI (Login / Logout) ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard')) # Zaten giriş yapmışsa ana sayfaya yolla
+        return redirect(url_for('dashboard')) 
 
     if request.method == 'POST':
         username = request.form.get('username')
@@ -67,7 +60,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and bcrypt.check_password_hash(user.password_hash, password):
-            login_user(user) # Kullanıcıyı "giriş yapmış" olarak işaretle
+            login_user(user)
             flash(f'Hoşgeldiniz, {user.username}!', 'success')
             return redirect(url_for('dashboard'))
         else:
@@ -76,18 +69,17 @@ def login():
     return render_template('login.html', title='Giriş Yap')
 
 @app.route('/logout')
-@login_required # Sadece giriş yapmışlar çıkış yapabilir
+@login_required
 def logout():
-    logout_user() # Kullanıcıyı "çıkış yapmış" olarak işaretle
+    logout_user()
     flash('Başarıyla çıkış yaptınız.', 'info')
     return redirect(url_for('login'))
 
 
 # --- ANA SAYFA (DASHBOARD) ---
 @app.route('/')
-@login_required # BU SAYFA ARTIK KORUMALI
+@login_required
 def dashboard():
-    # Excel yükleme formu artık GET'te değil, ayrı bir route'da
     try:
         toplam_satis_kaydi = db.session.query(SatisKaydi).count()
         toplam_urun = db.session.query(Urun).count()
@@ -101,9 +93,10 @@ def dashboard():
 
     return render_template('dashboard.html', title='Ana Ekran', summary=summary)
 
-# --- EXCEL YÜKLEME (Artık kendi route'unda) ---
+
+# --- EXCEL YÜKLEME ---
 @app.route('/upload-excel', methods=['POST'])
-@login_required # BU İŞLEM ARTIK KORUMALI
+@login_required
 def upload_excel():
     if 'excel_file' not in request.files:
         flash('Dosya kısmı bulunamadı', 'danger')
@@ -116,16 +109,11 @@ def upload_excel():
     
     if file and file.filename.endswith('.xlsx'):
         try:
-            # --- BURAYA "AKILLI HATA KONTROLÜ" (Sorun 3) GELECEK ---
             df = pd.read_excel(file)
-            
-            # Kolon kontrolü (Sorun 3'ün çözümü)
             required_columns = ['Urun_Adi', 'Adet', 'Toplam_Tutar', 'Tarih']
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
                 raise ValueError(f"Excel dosyanızda şu kolonlar eksik: {', '.join(missing_columns)}")
-            
-            # --- Kontrol Tamam, İşleme Devam ---
             
             urunler_db = Urun.query.all()
             urun_eslestirme_haritasi = {u.excel_adi: u.id for u in urunler_db}
@@ -165,23 +153,25 @@ def upload_excel():
             if taninmayan_urunler:
                 flash(f"UYARI: Şu ürünler tanınmadı ve atlandı: {taninmayan_urunler}", 'warning')
 
-        except ValueError as ve: # Yakalanan "Akıllı Hata"
+        except ValueError as ve:
             flash(f"HATA OLUŞTU: {ve}", 'danger')
-        except Exception as e: # Yakalanamayan genel hata
+        except Exception as e:
             db.session.rollback()
             flash(f"BEKLENMEDİK HATA: {e}. Lütfen Excel formatınızı kontrol edin.", 'danger')
         
     return redirect(url_for('dashboard'))
 
 
-# --- YÖNETİM PANELİ (Hücre 3'ün Arayüzü) ---
+# --- YÖNETİM PANELİ (Faz 5, Aşama 2: CRUD) ---
 @app.route('/admin')
-@login_required # BU SAYFA ARTIK KORUMALI
+@login_required
 def admin_panel():
     try:
-        hammaddeler = Hammadde.query.all()
-        urunler = Urun.query.all()
-        receteler = Recete.query.all()
+        # Formlardaki (Reçete) açılır menüleri doldurmak için bu listeleri çekiyoruz
+        hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
+        urunler = Urun.query.order_by(Urun.isim).all()
+        # Tablodaki reçeteleri çekiyoruz
+        receteler = Recete.query.join(Urun).order_by(Urun.isim, Hammadde.isim).all()
     except Exception as e:
         flash(f'Veritabanı hatası: {e}', 'danger')
         hammaddeler, urunler, receteler = [], [], []
@@ -191,49 +181,103 @@ def admin_panel():
                            urunler=urunler, 
                            receteler=receteler)
 
-
-@app.route('/reset-menu-data', methods=['POST'])
-@login_required # BU İŞLEM ARTIK KORUMALI
-def reset_menu_data():
+# --- YENİ EKLENDİ (Faz 5): Hammadde Ekleme Motoru ---
+@app.route('/add-material', methods=['POST'])
+@login_required
+def add_material():
+    try:
+        isim = request.form.get('h_isim')
+        birim = request.form.get('h_birim')
+        fiyat = float(request.form.get('h_fiyat'))
+        
+        yeni_hammadde = Hammadde(isim=isim, maliyet_birimi=birim, maliyet_fiyati=fiyat)
+        db.session.add(yeni_hammadde)
+        db.session.commit()
+        flash(f"Başarılı! '{isim}' hammaddesi eklendi.", 'success')
     
-    # --- BU BÖLÜM GELECEKTE KALKACAK (CRUD Geldiginde) ---
-    hammaddeler_data = [
-        ('Köfte Harcı', 'kg', 1200.0), ('Cheeseburger Ekmeği', 'adet', 15.0),
-        ('Cheddar Peyniri', 'kg', 700.0), ('Steak Eti (Bonfile)', 'kg', 1800.0), 
-        ('Pesto Sos', 'kg', 450.0), ('Makarna (Pişmemiş)', 'kg', 100.0),
-        ('Domates', 'kg', 80.0), ('Bira (Fıçı)', 'litre', 200.0),
-    ]
-    urunler_data = [
-        ('Cheeseburger',    'Cheeseburger',    250.0, 'Burgerler',     'Ana Yemekler'),
-        ('Steak Burger',    'Steak Burger',    400.0, 'Burgerler',     'Ana Yemekler'),
-        ('Steak Tabağı',    'Steak Tabağı',    550.0, 'Et Yemekleri',  'Ana Yemekler'),
-        ('Pesto Makarna',  'Pesto Makarna',  220.0, 'Makarnalar',    'Ana Yemekler'),
-        ('Domates Çorbası', 'Domates Çorbası',  90.0, 'Başlangıçlar',  'Başlangıçlar'),
-        ('Bira 50cl',       'Bira 50cl',       100.0, 'İçecekler',     'İçecekler'),
-    ]
-    receteler_data = [
-        ('Cheeseburger', 'Köfte Harcı', 0.150), ('Cheeseburger', 'Cheeseburger Ekmeği', 1),   
-        ('Cheeseburger', 'Cheddar Peyniri', 0.020), ('Steak Burger', 'Steak Eti (Bonfile)', 0.180), 
-        ('Steak Burger', 'Cheeseburger Ekmeği', 1), ('Steak Tabağı', 'Steak Eti (Bonfile)', 0.220), 
-        ('Pesto Makarna', 'Makarna (Pişmemiş)', 0.120), ('Pesto Makarna', 'Pesto Sos', 0.080),        
-        ('Domates Çorbası', 'Domates', 0.250), ('Bira 50cl', 'Bira (Fıçı)', 0.5), 
-    ]
-    # --- BU BÖLÜM GELECEKTE KALKACAK ---
-    
-    success, message = menuyu_sifirla_ve_kur(hammaddeler_data, urunler_data, receteler_data)
-    
-    if success:
-        flash(message, 'success')
-    else:
-        flash(message, 'danger')
+    except IntegrityError: # Eğer aynı isimde hammadde varsa
+        db.session.rollback()
+        flash(f"HATA: '{isim}' adında bir hammadde zaten mevcut. Eklenemedi.", 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Hammadde eklenirken bir hata oluştu: {e}", 'danger')
         
     return redirect(url_for('admin_panel'))
 
 
-# --- ANALİZ RAPORLARI SAYFASI ---
+# --- YENİ EKLENDİ (Faz 5): Ürün Ekleme Motoru ---
+@app.route('/add-product', methods=['POST'])
+@login_required
+def add_product():
+    try:
+        isim = request.form.get('u_isim')
+        excel_adi = request.form.get('u_excel_adi')
+        fiyat = float(request.form.get('u_fiyat'))
+        kategori = request.form.get('u_kategori')
+        grup = request.form.get('u_grup')
+        
+        yeni_urun = Urun(
+            isim=isim, 
+            excel_adi=excel_adi, 
+            mevcut_satis_fiyati=fiyat, 
+            kategori=kategori, 
+            kategori_grubu=grup,
+            hesaplanan_maliyet=0 # Maliyet reçete girilince hesaplanacak
+        )
+        db.session.add(yeni_urun)
+        db.session.commit()
+        flash(f"Başarılı! '{isim}' ürünü eklendi. (Maliyet için reçete ekleyin)", 'success')
+    
+    except IntegrityError:
+        db.session.rollback()
+        flash(f"HATA: '{isim}' adında bir ürün zaten mevcut. Eklenemedi.", 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Ürün eklenirken bir hata oluştu: {e}", 'danger')
+        
+    return redirect(url_for('admin_panel'))
+
+
+# --- YENİ EKLENDİ (Faz 5): Reçete Ekleme Motoru ---
+@app.route('/add-recipe', methods=['POST'])
+@login_required
+def add_recipe():
+    try:
+        urun_id = int(request.form.get('r_urun_id'))
+        hammadde_id = int(request.form.get('r_hammadde_id'))
+        miktar = float(request.form.get('r_miktar'))
+        
+        # Bu reçete kalemi zaten var mı? (Gelecekte "güncelleme" için geliştirilebilir)
+        existing_recipe = Recete.query.filter_by(urun_id=urun_id, hammadde_id=hammadde_id).first()
+        if existing_recipe:
+            flash("UYARI: Bu ürün için bu hammadde zaten reçetede vardı. Miktarı güncellendi.", 'warning')
+            existing_recipe.miktar = miktar
+        else:
+            yeni_recete = Recete(urun_id=urun_id, hammadde_id=hammadde_id, miktar=miktar)
+            db.session.add(yeni_recete)
+            flash("Başarılı! Reçete kalemi eklendi.", 'success')
+        
+        db.session.commit()
+        
+        # --- ÇOK ÖNEMLİ ---
+        # Reçete eklendiği anda, o ürünün toplam maliyetini GÜNCELLE
+        guncelle_tum_urun_maliyetleri()
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"HATA: Reçete eklenirken bir hata oluştu: {e}", 'danger')
+        
+    return redirect(url_for('admin_panel'))
+
+
+# --- ARTIK GEREKLİ DEĞİL (Kullanıcı dostu değil): reset_menu_data fonksiyonu kaldırıldı ---
+
+
+# --- ANALİZ RAPORLARI SAYFASI (Değişiklik yok) ---
 @app.route('/reports', methods=['GET', 'POST'])
-@login_required # BU SAYFA ARTIK KORUMALI
+@login_required
 def reports():
+    # Bu listeler formları doldurmak için gerekli
     urun_listesi = [u.isim for u in Urun.query.order_by(Urun.isim).all()]
     kategori_listesi = sorted(list(set([u.kategori for u in Urun.query.all() if u.kategori])))
     grup_listesi = sorted(list(set([u.kategori_grubu for u in Urun.query.all() if u.kategori_grubu])))
