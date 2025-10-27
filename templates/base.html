@@ -1,159 +1,64 @@
 <!doctype html>
-<html lang="tr">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    
-    <!-- Bootstrap İkonları -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <!-- Google Fonts (Poppins) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
-    <title>{{ title }} - RestoProfit</title>
+<a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>
+<i class="bi bi-house-door"></i> Ana Ekran
+</a>
+</li>
+<li class="nav-item">
+<a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" href="{{ url_for('reports') }}" {% if request.endpoint == 'reports' %}aria-current="page"{% endif %}>
+<i class="bi bi-calculator-fill"></i> Analiz Motorları
+</a>
+</li>
+<li class="nav-item">
+<a class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}" href="{{ url_for('admin_panel') }}" {% if request.endpoint == 'admin_panel' %}aria-current="page"{% endif %}>
+<i class="bi bi-gear"></i> Menü Yönetimi
+</a>
+</li>
+</ul>
 
-    <style>
-        /* Ana stil ayarları */
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f8f9fa; /* Hafif gri arka plan */
-        }
-        
-        /* Navbar ayarları */
-        .navbar {
-            background-color: #ffffff;
-            box-shadow: 0 2px 4px rgba(0,0,0,.04);
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
-        }
 
-        /* Logo stil ayarları */
-        .navbar-brand img {
-            max-height: 40px; /* Logo yüksekliği */
-            margin-right: 10px;
-        }
+<ul class="navbar-nav">
+{% if current_user.is_authenticated %}
+<li class="nav-item dropdown">
+<a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+<i class="bi bi-person-circle" aria-hidden="true"></i>
+<span class="ms-1">{{ current_user.username }}</span>
+</a>
+<ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+<li><a class="dropdown-item" href="{{ url_for('change_password') }}"><i class="bi bi-key-fill"></i> Şifre Değiştir</a></li>
+<li><hr class="dropdown-divider"></li>
+<li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
+</ul>
+</li>
+{% else %}
+<li class="nav-item">
+<a class="nav-link" href="{{ url_for('login') }}"><i class="bi bi-box-arrow-in-right"></i> Giriş Yap</a>
+</li>
+{% endif %}
+</ul>
+</div>
+</div>
+</nav>
 
-        /* Navbar linkleri için */
-        .navbar-nav .nav-link {
-            font-weight: 500;
-            color: #495057; /* Koyu gri metin */
-        }
-        
-        .navbar-nav .nav-link.active,
-        .navbar-nav .nav-link:hover {
-            color: #000; /* Vurgu rengi */
-        }
 
-        /* Kullanıcı menüsü */
-        .navbar-nav .dropdown-toggle::after {
-            display: none; /* Bootstrap'in varsayılan okunu gizle */
-        }
+<main class="container my-5">
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+{{ message }}
+<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
 
-        /* Ana içerik alanı */
-        main.container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        
-        /* Kart stili */
-        .card {
-            border: 1px solid #e2e8f0;
-            border-radius: 0.75rem; /* 12px */
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-            margin-bottom: 1.5rem;
-        }
 
-        .card-header {
-            background-color: #f7f9fc;
-            border-bottom: 1px solid #e2e8f0;
-        }
-    </style>
-</head>
-<body class="d-flex flex-column min-vh-100">
-    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
-        <div class="container-fluid">
-            <!-- Logo -->
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAE0ATQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAr/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJ/gD/n//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAn8B/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAUP/aAAgBAQABPyH/2gAMAwEAAgADAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QP//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QP//EABQQAQAAAAAAAAAAAAAAAAAAACD/2gAIAQEAAT8QP//Z" alt="Logo">
-            </a>
+{% block content %}{% endblock %}
+</main>
 
-            <!-- Mobil için açma/kapama butonu -->
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
 
-            <!-- Menü İçeriği -->
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <!-- Sol Taraf Linkleri (Ana Ekran, Raporlar, Yönetim) -->
-                <ul class="navbar-nav justify-content-center flex-grow-1 pe-3">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                            <i class="bi bi-house-door"></i> Ana Ekran
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" href="{{ url_for('reports') }}">
-                            <i class="bi bi-calculator-fill"></i> Analiz Motorları
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}" href="{{ url_for('admin_panel') }}">
-                            <i class="bi bi-gear"></i> Menü Yönetimi
-                        </a>
-                    </li>
-                </ul>
-
-                <!-- Sağ Taraf: Kullanıcı Menüsü -->
-                <ul class="navbar-nav">
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i classD="bi bi-person-circle"></i>
-                                <span class="ms-1">{{ current_user.username }}</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('change_password') }}"><i class="bi bi-key-fill"></i> Şifre Değiştir</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
-                            </ul>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}"><i class="bi bi-box-arrow-in-right"></i> Giriş Yap</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </nav>
-    
-    <main class="container my-5">
-        <!-- Hata ve Bilgi Mesajları -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type"button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <!-- Sayfa içeriği buraya gelecek -->
-        {% block content %}{% endblock %}
-    </main>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-    
-    {% block scripts %}
-    <!-- Sayfaya özel scriptler buraya eklenebilir -->
-    {% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js" defer></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>
