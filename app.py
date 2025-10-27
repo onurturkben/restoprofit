@@ -1,20 +1,11 @@
 # app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
-# -----------------------------------------------------------------------------
-# ÖNE ÇIKANLAR
-# - Tekil ve sağlam /change-password route (duplikasyon kaldırıldı)
-# - /reports sorgularında distinct/order_by zinciri düzeltildi
-# - Excel upload action adıyla uyumlu (@app.route('/upload-excel'))
-# - Ortak yardımcılar: parse_decimal(), safe_float()
-# - Hata yönetimi ve güvenlik başlıkları (CSP’yi gevşek tuttuk; CDN’lerle uyumlu)
-# - MAX_CONTENT_LENGTH ile dosya boyutu sınırı + 413 handler
-# - İlk admin kullanıcısı için ENV destekli otomatik kurulum
-# - Kod genelinde tutarlı flash kategori adları ve mesaj metinleri
-# -----------------------------------------------------------------------------
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+import pandas as pd
 from flask import (
-    Flask, render_template, request, redirect, url_for, flash
+    Flask, render_template, render_template_string, request,
+    redirect, url_for, flash, send_from_directory
 )
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -22,14 +13,11 @@ from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-import pandas as pd
 
 from database import (
     db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
     guncelle_tum_urun_maliyetleri
 )
-
-# Analiz motorları
 from analysis_engine import (
     hesapla_hedef_marj,
     simule_et_fiyat_degisikligi,
@@ -41,7 +29,7 @@ from analysis_engine import (
 # Yardımcılar
 # -----------------------------------------------------------------------------
 def parse_decimal(value: str, default=None):
-    """Virgüllü/ noktalı ondalıkları güvenle float'a çevirir."""
+    """Virgüllü/noktalı ondalıkları güvenle float'a çevirir."""
     if value is None:
         return default
     try:
@@ -56,12 +44,28 @@ def safe_int(value, default=None):
         return default
 
 # -----------------------------------------------------------------------------
-# Uygulama Kurulumu
+# Uygulama Yapılandırması
 # -----------------------------------------------------------------------------
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'DEGISTIRIN:dev-secret-key')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB upload limiti
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'static/uploads')
+
+    # Prod güvenlik/oturum (CDN kullandığımız için CSP gevşek)
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = True
+    REMEMBER_COOKIE_HTTPONLY = True
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
+    SEND_FILE_MAX_AGE_DEFAULT = 86400  # 1 gün
+
+    # SQLAlchemy: Render kopmalarına karşı güvenli havuz
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
+
 
 def create_app():
     app = Flask(__name__)
@@ -70,7 +74,7 @@ def create_app():
     # Upload klasörü
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-    # DB init
+    # DB init (DATABASE_URL varsa Postgres, yoksa sqlite fallback)
     init_db(app)
 
     # Auth
@@ -84,7 +88,7 @@ def create_app():
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
-    # İlk admin (ENV üzerinden tercih edilir)
+    # İlk admin (ENV ile override edilebilir)
     with app.app_context():
         db.create_all()
         if not User.query.first():
@@ -104,13 +108,13 @@ def create_app():
     def inject_globals():
         return dict(current_user=current_user, site_name="RestoProfit")
 
-    # Basit güvenlik başlıkları
+    # Güvenlik başlıkları
     @app.after_request
     def set_security_headers(resp):
         resp.headers['X-Content-Type-Options'] = 'nosniff'
         resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
         resp.headers['Referrer-Policy'] = 'no-referrer-when-downgrade'
-        # CDN kullandığımız için çok sıkı bir CSP uygulamıyoruz; temel koruma:
+        # CDN’lerle uyumlu, temel CSP
         resp.headers['Content-Security-Policy'] = (
             "default-src 'self' https: data: blob:; "
             "img-src 'self' https: data:; "
@@ -130,12 +134,59 @@ def create_app():
 
     @app.errorhandler(404)
     def not_found(_e):
-        return render_template('base.html', title='Bulunamadı'), 404
+        # Ayrı bir errors/404.html yoksa base.html ile boş sayfa render
+        try:
+            return render_template('errors/404.html', title='Bulunamadı'), 404
+        except Exception:
+            return render_template('base.html', title='Bulunamadı'), 404
 
     @app.errorhandler(500)
     def server_error(e):
-        flash(f"Sunucu hatası: {e}", "danger")
-        return redirect(url_for('dashboard'))
+        # burada log da atılabilir: app.logger.exception(e)
+        try:
+            return render_template('errors/500.html', title='Sunucu Hatası'), 500
+        except Exception:
+            # Temel, geri-dönüş render
+            html = """
+            {% extends 'base.html' %}
+            {% block content %}
+              <div class="container">
+                <div class="alert alert-danger" role="alert">
+                  Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.
+                </div>
+              </div>
+            {% endblock %}
+            """
+            return render_template_string(html), 500
+
+    # -----------------------------------------------------------------------------
+    # Yardımcı Servis Uçları
+    # -----------------------------------------------------------------------------
+    @app.route('/healthz')
+    def healthz():
+        # DB ping (opsiyonel)
+        try:
+            db.session.execute("SELECT 1")
+        except Exception:
+            return ("db_fail", 500)
+        return ("ok", 200)
+
+    @app.route('/robots.txt')
+    def robots_txt():
+        return (
+            "User-agent: *\n"
+            "Disallow:\n",
+            200,
+            {"Content-Type": "text/plain; charset=utf-8"},
+        )
+
+    @app.route('/favicon.ico')
+    def favicon():
+        static_fav = os.path.join(app.root_path, 'static', 'favicon.ico')
+        if os.path.exists(static_fav):
+            return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico',
+                                       mimetype='image/vnd.microsoft.icon')
+        return ('', 204)
 
     # -----------------------------------------------------------------------------
     # ROUTES
@@ -175,7 +226,7 @@ def create_app():
             new_password = request.form.get('new_password')
             confirm_password = request.form.get('confirm_password')
 
-            if not bcrypt.check_password_hash(current_user.password_hash, current_password):
+            if not current_password or not bcrypt.check_password_hash(current_user.password_hash, current_password):
                 flash('Mevcut şifreniz hatalı.', 'danger')
                 return redirect(url_for('change_password'))
 
@@ -183,7 +234,7 @@ def create_app():
                 flash('Yeni şifreler birbiriyle eşleşmiyor.', 'danger')
                 return redirect(url_for('change_password'))
 
-            if len(new_password) < 6:
+            if not new_password or len(new_password) < 6:
                 flash('Yeni şifreniz en az 6 karakter olmalıdır.', 'danger')
                 return redirect(url_for('change_password'))
 
@@ -600,7 +651,6 @@ def create_app():
             kategoriler_db = db.session.query(Urun.kategori).distinct().order_by(Urun.kategori).all()
             kategori_listesi = sorted([k[0] for k in kategoriler_db if k[0]])
 
-            # DÜZELTİLDİ: distinct().order_by(...).all()
             gruplar_db = db.session.query(Urun.kategori_grubu).distinct().order_by(Urun.kategori_grubu).all()
             grup_listesi = sorted([g[0] for g in gruplar_db if g[0]])
 
@@ -686,7 +736,7 @@ def create_app():
                                chart_data=chart_data,
                                analiz_tipi_baslik=analiz_tipi_baslik)
 
-    # Render.com için
+    # Flask run (lokal) / Render (gunicorn) uyumlu dönüş
     return app
 
 
