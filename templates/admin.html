@@ -366,7 +366,7 @@
   tabindex="-1"
   aria-labelledby="editMaterialModalLabel"
   aria-hidden="true"
-  data-action-template="{{ url_for('edit_material', id='__ID__') }}"
+  data-action-template="{{ url_for('edit_material', id=0) }}"
 >
   <div class="modal-dialog">
     <div class="modal-content">
@@ -405,7 +405,7 @@
   tabindex="-1"
   aria-labelledby="editProductModalLabel"
   aria-hidden="true"
-  data-action-template="{{ url_for('edit_product', id='__ID__') }}"
+  data-action-template="{{ url_for('edit_product', id=0) }}"
 >
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -454,7 +454,7 @@
   tabindex="-1"
   aria-labelledby="editRecipeModalLabel"
   aria-hidden="true"
-  data-action-template="{{ url_for('edit_recipe', id='__ID__') }}"
+  data-action-template="{{ url_for('edit_recipe', id=0) }}"
 >
   <div class="modal-dialog">
     <div class="modal-content">
@@ -487,15 +487,15 @@
   const qs = (root, sel) => root.querySelector(sel);
 
   /**
-   * data-action-template = "/edit-.../__ID__" şeklindeki şablonu
-   * verilen id ile değiştirip form.action'a yazar.
+   * data-action-template = "/edit-.../0" şeklindeki şablonda
+   * sondaki sayıyı, verilen id ile değiştirir.
    */
   function setFormActionFromTemplate(modalEl, id) {
     const template = modalEl.getAttribute('data-action-template');
     if (!template) return;
     const form = qs(modalEl, 'form');
     if (!form) return;
-    form.action = template.replace('__ID__', String(id));
+    form.action = template.replace(/\/\d+$/, '/' + String(id));
   }
 
   // 1) Hammadde Düzenleme
