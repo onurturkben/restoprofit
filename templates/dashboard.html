@@ -1,36 +1,23 @@
 {% extends 'base.html' %}
-
 {% block content %}
-
-    <h1 class="mb-4"><i class="bi bi-house-door-fill"></i> Ana Ekran</h1>
-    
-    <div class="row justify-content-center">
-        <div class="col-lg-8"> <div class="card shadow-sm mb-4"> <div class="card-body p-4"> <h5 class="card-title text-muted">Toplam Ürün</h5>
-                    <p class="card-text fs-3">{{ summary.toplam_urun }} adet</p>
-                </div>
-            </div>
-            
-            <div class="card shadow-sm mb-5"> <div class="card-body p-4">
-                    <h5 class="card-title text-muted">Toplam Satış Kaydı</h5>
-                    <p class="card-text fs-3">{{ summary.toplam_satis_kaydi }} adet</p>
-                </div>
-            </div>
-
-            <div class="card shadow-sm mb-5">
-                <div class="card-body p-4">
-                    <h3 class="mb-3">Yeni Satış Raporu Yükle</h3>
-                    <p class="text-muted">Lütfen Adisyon sisteminizden aldığınız `.xlsx` formatındaki satış raporunu seçin.</p>
-                    <p class="text-muted small">Kolonlar: 'Urun_Adi', 'Adet', 'Toplam_Tutar', 'Tarih'</p>
-                    
-                    <form method="POST" enctype="multipart/form-data" class="mt-4">
-                        <div class="input-group">
-                            <input type="file" class="form-control" name="excel_file" id="excel_file" accept=".xlsx" required>
-                            <button class="btn btn-success" type="submit">
-                                <i class="bi bi-upload"></i> Yükle ve İşle
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        
-        </div> </div> {% endblock %}
+<h1 class="mb-4"><i class="bi bi-house-door-fill"></i> Ana Ekran</h1>
+<div class="row justify-content-center">
+<div class="col-lg-8">
+<div class="card shadow-sm mb-4"><div class="card-body p-4"><h5 class="card-title text-muted">Toplam Ürün</h5><p class="card-text fs-3">{{ summary.toplam_urun }} adet</p></div></div>
+<div class="card shadow-sm mb-5"><div class="card-body p-4"><h5 class="card-title text-muted">Toplam Satış Kaydı</h5><p class="card-text fs-3">{{ summary.toplam_satis_kaydi }} adet</p></div></div>
+<div class="card shadow-sm mb-5">
+<div class="card-body p-4">
+<h3 class="mb-3">Yeni Satış Raporu Yükle</h3>
+<p class="text-muted">Lütfen Adisyon sisteminizden aldığınız `.xlsx` formatındaki satış raporunu seçin.</p>
+<p class="text-muted small">Kolonlar: 'Urun_Adi', 'Adet', 'Toplam_Tutar', 'Tarih'</p>
+<form method="POST" action="{{ url_for('upload_excel') }}" enctype="multipart/form-data" class="mt-4">
+<div class="input-group">
+<input type="file" class="form-control" name="excel_file" id="excel_file" accept=".xlsx,.xls" required>
+<button class="btn btn-success" type="submit"><i class="bi bi-upload"></i> Yükle ve İşle</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}
