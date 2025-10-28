@@ -1,176 +1,150 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block content %}
-<div class="container py-4">
-  <h1 class="mb-3">Menü Yönetimi</h1>
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-  <div class="mt-3">
-    {% for category, message in messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% endfor %}
+<div class="container mt-4">
+  <h1 class="mb-4"><i class="bi bi-gear"></i> Menü Yönetimi</h1>
+
+  <!-- Eylem butonları -->
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAddMaterial">
+      <i class="bi bi-box-seam"></i> Hammadde Ekle
+    </button>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddProduct">
+      <i class="bi bi-basket3"></i> Ürün Ekle
+    </button>
+    <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalAddRecipe">
+      <i class="bi bi-journal-plus"></i> Reçete Oluştur
+    </button>
   </div>
+
+  <!-- Hata mesajı -->
+  {% if hata %}
+  <div class="alert alert-danger">{{ hata }}</div>
   {% endif %}
-  {% endwith %}
 
-  <!-- Bölmeler -->
-  <ul class="nav nav-tabs" id="adminTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="hammaddeler-tab" data-bs-toggle="tab" data-bs-target="#hammaddeler" type="button" role="tab">Hammaddeler</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="urunler-tab" data-bs-toggle="tab" data-bs-target="#urunler" type="button" role="tab">Ürünler</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="receteler-tab" data-bs-toggle="tab" data-bs-target="#receteler" type="button" role="tab">Reçeteler</button>
-    </li>
-  </ul>
-
-  <div class="tab-content mt-3">
-    <!-- Hammadde Listesi -->
-    <div class="tab-pane fade show active" id="hammaddeler" role="tabpanel">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5>Hammadde Listesi</h5>
-        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addMaterialModal">
-          <i class="bi bi-plus-circle"></i> Ekle
-        </button>
+  <!-- Hammadde Tablosu -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h4 class="card-title"><i class="bi bi-box-seam"></i> Hammaddeler</h4>
+      {% if hammaddeler %}
+      <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>İsim</th>
+              <th>Birim</th>
+              <th>Birim Fiyatı (TL)</th>
+              <th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in hammaddeler %}
+            <tr>
+              <td>{{ h.isim }}</td>
+              <td>{{ h.maliyet_birimi }}</td>
+              <td>{{ "%.2f"|format(h.birim_fiyati) }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('delete_material', id=h.id) }}" onsubmit="return confirm('Silmek istediğine emin misin?')" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-
-      <table class="table table-sm table-striped align-middle">
-        <thead><tr><th>Ad</th><th>Birim</th><th>Fiyat (TL)</th><th>İşlem</th></tr></thead>
-        <tbody>
-          {% for h in hammaddeler %}
-          <tr>
-            <td>{{ h.isim }}</td>
-            <td>{{ h.maliyet_birimi }}</td>
-            <td>{{ "%.2f"|format(h.maliyet_fiyati) }}</td>
-            <td>
-              <button
-                class="btn btn-sm btn-outline-primary"
-                data-bs-toggle="modal"
-                data-bs-target="#editMaterialModal"
-                data-id="{{ h.id }}"
-                data-isim="{{ h.isim }}"
-                data-birim="{{ h.maliyet_birimi }}"
-                data-fiyat="{{ h.maliyet_fiyati }}"
-              ><i class="bi bi-pencil"></i></button>
-              <form action="{{ url_for('delete_material', id=h.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Silinsin mi?')">
-                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-              </form>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="text-center text-muted">Henüz hammadde eklenmemiş.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% else %}
+      <p class="text-muted">Henüz hammadde eklenmemiş.</p>
+      {% endif %}
     </div>
+  </div>
 
-    <!-- Ürün Listesi -->
-    <div class="tab-pane fade" id="urunler" role="tabpanel">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5>Ürün Listesi</h5>
-        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addProductModal">
-          <i class="bi bi-plus-circle"></i> Ekle
-        </button>
+  <!-- Ürün Tablosu -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h4 class="card-title"><i class="bi bi-basket3"></i> Ürünler</h4>
+      {% if urunler %}
+      <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>İsim</th>
+              <th>Excel Adı</th>
+              <th>Kategori</th>
+              <th>Grup</th>
+              <th>Satış Fiyatı</th>
+              <th>Maliyet</th>
+              <th>Kâr Marjı (%)</th>
+              <th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in urunler %}
+            <tr>
+              <td>{{ u.isim }}</td>
+              <td>{{ u.excel_adi }}</td>
+              <td>{{ u.kategori }}</td>
+              <td>{{ u.kategori_grubu }}</td>
+              <td>{{ "%.2f"|format(u.satis_fiyati) }}</td>
+              <td>{{ "%.2f"|format(u.maliyet) }}</td>
+              <td>{{ "%.1f"|format(u.kar_marji) }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('delete_product', id=u.id) }}" onsubmit="return confirm('Silmek istediğine emin misin?')" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-
-      <table class="table table-sm table-striped align-middle">
-        <thead><tr><th>Ad</th><th>Excel Adı</th><th>Kategori</th><th>Grup</th><th>Fiyat (TL)</th><th>Maliyet</th><th>İşlem</th></tr></thead>
-        <tbody>
-          {% for u in urunler %}
-          <tr>
-            <td>{{ u.isim }}</td>
-            <td>{{ u.excel_adi }}</td>
-            <td>{{ u.kategori }}</td>
-            <td>{{ u.kategori_grubu }}</td>
-            <td>{{ "%.2f"|format(u.mevcut_satis_fiyati) }}</td>
-            <td>{{ "%.2f"|format(u.hesaplanan_maliyet or 0) }}</td>
-            <td>
-              <button
-                class="btn btn-sm btn-outline-primary"
-                data-bs-toggle="modal"
-                data-bs-target="#editProductModal"
-                data-id="{{ u.id }}"
-                data-isim="{{ u.isim }}"
-                data-excel_adi="{{ u.excel_adi }}"
-                data-fiyat="{{ u.mevcut_satis_fiyati }}"
-                data-kategori="{{ u.kategori }}"
-                data-grup="{{ u.kategori_grubu }}"
-              ><i class="bi bi-pencil"></i></button>
-              <form action="{{ url_for('delete_product', id=u.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ürün silinsin mi?')">
-                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-              </form>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="7" class="text-center text-muted">Henüz ürün eklenmemiş.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% else %}
+      <p class="text-muted">Henüz ürün eklenmemiş.</p>
+      {% endif %}
     </div>
+  </div>
 
-    <!-- Reçete Listesi -->
-    <div class="tab-pane fade" id="receteler" role="tabpanel">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5>Reçeteler</h5>
-        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addRecipeModal">
-          <i class="bi bi-plus-circle"></i> Ekle
-        </button>
+  <!-- Reçete Tablosu -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h4 class="card-title"><i class="bi bi-journal-text"></i> Reçeteler</h4>
+      {% if receteler %}
+      <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Ürün</th>
+              <th>Hammadde</th>
+              <th>Miktar</th>
+              <th>Birim</th>
+              <th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in receteler %}
+            <tr>
+              <td>{{ r.urun.isim }}</td>
+              <td>{{ r.hammadde.isim }}</td>
+              <td>{{ r.miktar }}</td>
+              <td>{{ r.hammadde.maliyet_birimi }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('delete_recipe', id=r.id) }}" onsubmit="return confirm('Silmek istediğine emin misin?')" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-
-      <table class="table table-sm table-striped align-middle">
-        <thead><tr><th>Ürün</th><th>Hammadde</th><th>Miktar</th><th>İşlem</th></tr></thead>
-        <tbody>
-          {% for recete_item in receteler %}
-          <tr>
-            <td>{{ recete_item.urun.isim }}</td>
-            <td>{{ recete_item.hammadde.isim }}</td>
-            <td>{{ recete_item.miktar }}</td>
-            <td>
-              <button
-                class="btn btn-sm btn-outline-primary"
-                data-bs-toggle="modal"
-                data-bs-target="#editRecipeModal"
-                data-id="{{ recete_item.id }}"
-                data-urun_isim="{{ recete_item.urun.isim }}"
-                data-hammadde_isim="{{ recete_item.hammadde.isim }}"
-                data-miktar="{{ recete_item.miktar }}"
-                data-birim="{{ recete_item.hammadde.maliyet_birimi }}"
-              ><i class="bi bi-pencil"></i></button>
-              <form action="{{ url_for('delete_recipe', id=recete_item.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Silinsin mi?')">
-                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-              </form>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" class="text-center text-muted">Henüz reçete eklenmemiş.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-
-      {% if recete_pagination %}
-      <nav class="mt-3" aria-label="Sayfalar">
-        <ul class="pagination pagination-sm justify-content-end">
-          <li class="page-item {% if not recete_pagination.has_prev %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('admin_panel', page=recete_pagination.prev_num) }}">Önceki</a>
-          </li>
-          <li class="page-item disabled">
-            <span class="page-link">Sayfa {{ recete_pagination.page }} / {{ recete_pagination.pages }}</span>
-          </li>
-          <li class="page-item {% if not recete_pagination.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('admin_panel', page=recete_pagination.next_num) }}">Sonraki</a>
-          </li>
-        </ul>
-      </nav>
+      {% else %}
+      <p class="text-muted">Henüz reçete eklenmemiş.</p>
       {% endif %}
     </div>
   </div>
 </div>
 
-<!-- ===== MODALLAR ===== -->
-{% include "modals.html" %}
+<!-- modallar dahil -->
+{% include 'modals.html' %}
+
 {% endblock %}
