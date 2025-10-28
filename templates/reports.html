@@ -6,7 +6,7 @@
 
 <div class="row g-3">
 
-  <!-- Hedef marj -->
+  <!-- Hedef Marj -->
   <div class="col-12">
     <div class="rp-card rp-shadow">
       <div class="rp-card-body">
@@ -28,11 +28,21 @@
             <button class="btn btn-dark w-100">Hesapla</button>
           </div>
         </form>
+
+        {% if aktif_analiz_tipi == 'hedef_marj' and analiz_sonucu %}
+          <hr class="my-4">
+          <div class="d-flex flex-column gap-2">
+            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
+            <div class="text-muted">Sonuç özeti</div>
+            {% if chart_data %}<canvas id="chart-hedef" height="120"></canvas>{% endif %}
+            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- Simülatör -->
+  <!-- Fiyat Simülatörü -->
   <div class="col-12">
     <div class="rp-card rp-shadow">
       <div class="rp-card-body">
@@ -54,11 +64,21 @@
             <button class="btn btn-dark w-100">Simüle Et</button>
           </div>
         </form>
+
+        {% if aktif_analiz_tipi == 'simulasyon' and analiz_sonucu %}
+          <hr class="my-4">
+          <div class="d-flex flex-column gap-2">
+            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
+            <div class="text-muted">Simülasyon çıktısı</div>
+            {% if chart_data %}<canvas id="chart-sim" height="120"></canvas>{% endif %}
+            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- Optimum fiyat -->
+  <!-- Optimum Fiyat -->
   <div class="col-12">
     <div class="rp-card rp-shadow">
       <div class="rp-card-body">
@@ -76,11 +96,21 @@
             <button class="btn btn-dark w-100">Hesapla</button>
           </div>
         </form>
+
+        {% if aktif_analiz_tipi == 'optimum_fiyat' and analiz_sonucu %}
+          <hr class="my-4">
+          <div class="d-flex flex-column gap-2">
+            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
+            <div class="text-muted">Kâr eğrisi ve öneri</div>
+            {% if chart_data %}<canvas id="chart-opt" height="120"></canvas>{% endif %}
+            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- Stratejik analiz -->
+  <!-- Stratejik Analiz -->
   <div class="col-12">
     <div class="rp-card rp-shadow">
       <div class="rp-card-body">
@@ -126,37 +156,46 @@
             </div>
           </form>
         </div>
+
+        {% if aktif_analiz_tipi in ['kategori','grup'] and analiz_sonucu %}
+          <hr class="my-4">
+          <div class="d-flex flex-column gap-2">
+            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
+            <div class="text-muted">Pay dağılımı</div>
+            {% if chart_data %}<canvas id="chart-str" height="140"></canvas>{% endif %}
+            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  {% if analiz_sonucu %}
-  <div class="col-12">
-    <div class="rp-card rp-shadow">
-      <div class="rp-card-body">
-        <h2 class="mb-3">{{ analiz_tipi_baslik }}</h2>
-        {% if chart_data %}
-        <canvas id="reportChart" height="120"></canvas>
-        <hr class="my-4">
-        {% endif %}
-        <pre class="mb-0" style="background:#fff; border:none; padding:0;">{{ analiz_sonucu }}</pre>
-      </div>
-    </div>
-  </div>
-  {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-{% if chart_data %}
+{% if chart_data and aktif_analiz_tipi %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
 (function(){
   try{
     const data = JSON.parse({{ (chart_data or 'null')|tojson|safe }});
-    const el = document.getElementById('reportChart'); if(!el||!data) return;
-    const type = (data.datasets && data.datasets.length>1) ? 'bar':'line';
+    if(!data) return;
+
+    // Hangi form çalıştıysa o kartın içindeki canvas'ı hedefle
+    const idMap = {
+      'hedef_marj':'chart-hedef',
+      'simulasyon':'chart-sim',
+      'optimum_fiyat':'chart-opt',
+      'kategori':'chart-str',
+      'grup':'chart-str'
+    };
+    const targetId = idMap['{{ aktif_analiz_tipi }}'];
+    const el = document.getElementById(targetId);
+    if(!el) return;
+
+    const type = (data.datasets && data.datasets.length>1) ? 'bar' : 'line';
     new Chart(el.getContext('2d'), {
       type, data,
       options:{
