@@ -1,28 +1,41 @@
-# app.py — RestoProfit (temiz, optimize ve düzgün girintili sürüm)
+# app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
 
 import os
 from datetime import datetime, timedelta
 import pandas as pd
+
 from flask import (
     Flask, render_template, render_template_string, request,
     redirect, url_for, flash, send_from_directory
 )
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
+
 from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 
-# database.py içinde şu sembollerin tanımlı olduğundan emin ol:
-# db, init_db, Hammadde, Urun, Recete, SatisKaydi, User, guncelle_tum_urun_maliyetleri
-from database import (
-    db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
-    guncelle_tum_urun_maliyetleri
-)
+from sqlalchemy import func, text
+from sqlalchemy.orm import joinedload
 
-# Analiz motorları
+# --- database.py içe aktarımları ---
+# Bazı projelerde init_db tanımlı değilse fallback yapıyoruz.
+try:
+    from database import (
+        db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
+        guncelle_tum_urun_maliyetleri
+    )
+except ImportError:
+    from database import (
+        db, Hammadde, Urun, Recete, SatisKaydi, User,
+        guncelle_tum_urun_maliyetleri
+    )
+
+    def init_db(app):
+        """Fallback: database.init_app + DATABASE_URL var ise bağlanır."""
+        db.init_app(app)
+
+
+# --- analiz motorları ---
 from analysis_engine import (
     hesapla_hedef_marj,
     simule_et_fiyat_degisikligi,
@@ -71,9 +84,7 @@ class Config:
         "pool_recycle": 300,
     }
 
-# -----------------------------------------------------------------------------
-# App Factory
-# -----------------------------------------------------------------------------
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -95,29 +106,20 @@ def create_app():
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
-    # --- Admin kullanıcı sıfırlama / oluşturma ---
+    # İlk admin (ENV ile override edilebilir)
     with app.app_context():
         db.create_all()
-
-        ADMIN_USERNAME = "onur"
-        ADMIN_PASSWORD = "RestoranSifrem!2025"
-
-        try:
-            admin = User.query.filter_by(username=ADMIN_USERNAME).first()
-            hashed_password = bcrypt.generate_password_hash(ADMIN_PASSWORD).decode('utf-8')
-
-            if not admin:
-                admin = User(username=ADMIN_USERNAME, password_hash=hashed_password)
-                db.session.add(admin)
+        if not User.query.first():
+            admin_user = os.environ.get('ADMIN_USER', 'onur')
+            admin_pass = os.environ.get('ADMIN_PASS', 'RestoranSifrem!2025')
+            try:
+                hashed_password = bcrypt.generate_password_hash(admin_pass).decode('utf-8')
+                db.session.add(User(username=admin_user, password_hash=hashed_password))
                 db.session.commit()
-                print(f"[INIT] Yeni admin oluşturuldu: {ADMIN_USERNAME}")
-            else:
-                admin.password_hash = hashed_password
-                db.session.commit()
-                print(f"[INIT] Admin şifresi sıfırlandı: {ADMIN_USERNAME}")
-        except Exception as e:
-            db.session.rollback()
-            print(f"[INIT ERROR] Admin oluşturulamadı veya sıfırlanamadı: {e}")
+                print(f"[INIT] Admin oluşturuldu -> kullanıcı: {admin_user}")
+            except Exception as e:
+                db.session.rollback()
+                print(f"[INIT] Admin oluşturulamadı: {e}")
 
     # Global template değişkenleri
     @app.context_processor
@@ -150,17 +152,19 @@ def create_app():
 
     @app.errorhandler(404)
     def not_found(_e):
-        # Ayrı bir errors/404.html yoksa base.html ile sade sayfa
+        # Ayrı bir errors/404.html yoksa base.html ile boş sayfa render
         try:
             return render_template('errors/404.html', title='Bulunamadı'), 404
         except Exception:
             return render_template('base.html', title='Bulunamadı'), 404
 
     @app.errorhandler(500)
-    def server_error(_e):
+    def server_error(e):
+        # burada log da atılabilir: app.logger.exception(e)
         try:
             return render_template('errors/500.html', title='Sunucu Hatası'), 500
         except Exception:
+            # Temel, geri-dönüş render
             html = """
             {% extends 'base.html' %}
             {% block content %}
@@ -178,8 +182,9 @@ def create_app():
     # -----------------------------------------------------------------------------
     @app.route('/healthz')
     def healthz():
+        # DB ping (SQLAlchemy 2.x uyumlu)
         try:
-            db.session.execute("SELECT 1")
+            db.session.execute(text("SELECT 1"))
         except Exception:
             return ("db_fail", 500)
         return ("ok", 200)
@@ -230,7 +235,7 @@ def create_app():
         flash('Başarıyla çıkış yaptınız.', 'info')
         return redirect(url_for('login'))
 
-    # Şifre Değiştir
+    # Şifre Değiştir (tek sürüm)
     @app.route('/change-password', methods=['GET', 'POST'])
     @login_required
     def change_password():
@@ -365,35 +370,62 @@ def create_app():
     @app.route('/admin')
     @login_required
     def admin_panel():
+        # URL parametreleri: ?page=2&per=25 gibi
         page = request.args.get('page', default=1, type=int)
         per = request.args.get('per', default=25, type=int)
 
         try:
-            hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
-            urunler = Urun.query.order_by(Urun.isim).all()
+            # Flask-SQLAlchemy 3.x uyumlu SELECT + scalars()
+            hammaddeler = db.session.scalars(
+                db.select(Hammadde).order_by(Hammadde.isim)
+            ).all()
 
-            recete_query = (Recete.query
-                            .options(joinedload(Recete.urun), joinedload(Recete.hammadde))
-                            .join(Urun, Urun.id == Recete.urun_id)
-                            .join(Hammadde, Hammadde.id == Recete.hammadde_id)
-                            .order_by(Urun.isim, Hammadde.isim))
+            urunler = db.session.scalars(
+                db.select(Urun).order_by(Urun.isim)
+            ).all()
 
-            recete_pagination = recete_query.paginate(page=page, per_page=per, error_out=False)
+            # Reçeteler için joinedload + SELECT
+            recete_stmt = (
+                db.select(Recete)
+                  .options(
+                      joinedload(Recete.urun),
+                      joinedload(Recete.hammadde),
+                  )
+                  .join(Urun, Urun.id == Recete.urun_id)
+                  .join(Hammadde, Hammadde.id == Recete.hammadde_id)
+                  .order_by(Urun.isim, Hammadde.isim)
+            )
+
+            # Flask-SQLAlchemy 3.x’te paginate bu şekilde
+            recete_pagination = db.paginate(
+                recete_stmt,
+                page=page,
+                per_page=per,
+                error_out=False
+            )
             receteler = recete_pagination.items
 
-        except Exception as e:
-            flash(f'Veritabanı hatası: {e}', 'danger')
-            hammaddeler, urunler, receteler = [], [], []
-            recete_pagination = None
+            return render_template(
+                'admin.html',
+                title='Menü Yönetimi',
+                hammaddeler=hammaddeler,
+                urunler=urunler,
+                receteler=receteler,
+                recete_pagination=recete_pagination
+            )
 
-        return render_template(
-            'admin.html',
-            title='Menü Yönetimi',
-            hammaddeler=hammaddeler,
-            urunler=urunler,
-            receteler=receteler,
-            recete_pagination=recete_pagination
-        )
+        except Exception as e:
+            db.session.rollback()
+            # Hata durumunda boş listelerle sayfayı aç, mesaj göster
+            flash(f"Menü Yönetimi yüklenirken hata: {e}", "danger")
+            return render_template(
+                'admin.html',
+                title='Menü Yönetimi',
+                hammaddeler=[],
+                urunler=[],
+                receteler=[],
+                recete_pagination=None
+            )
 
     # --- Hammadde CRUD ---
     @app.route('/add-material', methods=['POST'])
@@ -414,12 +446,13 @@ def create_app():
             db.session.add(Hammadde(isim=isim, maliyet_birimi=birim, maliyet_fiyati=fiyat))
             db.session.commit()
             flash(f"'{isim}' eklendi.", 'success')
-        except IntegrityError:
-            db.session.rollback()
-            flash(f"'{isim}' zaten mevcut.", 'danger')
         except Exception as e:
             db.session.rollback()
-            flash(f"Hammadde eklenemedi: {e}", 'danger')
+            # IntegrityError dahil tüm hatalar
+            if 'UNIQUE' in str(e).upper():
+                flash(f"'{isim}' zaten mevcut.", 'danger')
+            else:
+                flash(f"Hammadde eklenemedi: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
     @app.route('/edit-material/<int:id>', methods=['POST'])
@@ -442,7 +475,11 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            if h.isim != isim and Hammadde.query.filter(Hammadde.isim == isim, Hammadde.id != id).first():
+            # isim çakışması kontrolü
+            exists = db.session.scalar(
+                db.select(Hammadde).where(Hammadde.isim == isim, Hammadde.id != id)
+            )
+            if exists:
                 flash(f"'{isim}' adında başka bir hammadde var.", 'danger')
                 return redirect(url_for('admin_panel'))
 
@@ -466,7 +503,11 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            if h.receteler.first():
+            # ilişkili reçete var mı?
+            linked = db.session.scalar(
+                db.select(Recete).where(Recete.hammadde_id == id).limit(1)
+            )
+            if linked:
                 flash(f"'{h.isim}' bir reçetede kullanıldığı için silinemez. Önce ilgili reçeteleri kaldırın.", 'danger')
                 return redirect(url_for('admin_panel'))
 
@@ -503,12 +544,12 @@ def create_app():
             db.session.add(urun)
             db.session.commit()
             flash(f"'{isim}' eklendi. Şimdi reçetesini oluşturun.", 'success')
-        except IntegrityError:
-            db.session.rollback()
-            flash(f"'{isim}' veya Excel adı '{excel_adi}' zaten mevcut.", 'danger')
         except Exception as e:
             db.session.rollback()
-            flash(f"Ürün eklenemedi: {e}", 'danger')
+            if 'UNIQUE' in str(e).upper():
+                flash(f"'{isim}' veya Excel adı '{excel_adi}' zaten mevcut.", 'danger')
+            else:
+                flash(f"Ürün eklenemedi: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
     @app.route('/edit-product/<int:id>', methods=['POST'])
@@ -533,10 +574,18 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            if urun.isim != isim and Urun.query.filter(Urun.isim == isim, Urun.id != id).first():
+            # isim ve excel_adi çakışmaları
+            exists_name = db.session.scalar(
+                db.select(Urun).where(Urun.isim == isim, Urun.id != id)
+            )
+            if exists_name:
                 flash(f"'{isim}' adında başka bir ürün var.", 'danger')
                 return redirect(url_for('admin_panel'))
-            if urun.excel_adi != excel_adi and Urun.query.filter(Urun.excel_adi == excel_adi, Urun.id != id).first():
+
+            exists_excel = db.session.scalar(
+                db.select(Urun).where(Urun.excel_adi == excel_adi, Urun.id != id)
+            )
+            if exists_excel:
                 flash(f"'{excel_adi}' Excel adına sahip başka bir ürün var.", 'danger')
                 return redirect(url_for('admin_panel'))
 
@@ -586,7 +635,9 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            existing = Recete.query.filter_by(urun_id=urun_id, hammadde_id=hammadde_id).first()
+            existing = db.session.scalar(
+                db.select(Recete).where(Recete.urun_id == urun_id, Recete.hammadde_id == hammadde_id)
+            )
             if existing:
                 existing.miktar = miktar
                 flash("Reçete kalemi mevcuttu, miktar güncellendi.", 'warning')
@@ -674,13 +725,19 @@ def create_app():
     @login_required
     def reports():
         try:
-            urunler_db = Urun.query.order_by(Urun.isim).all()
+            urunler_db = db.session.scalars(
+                db.select(Urun).order_by(Urun.isim)
+            ).all()
             urun_listesi = [u.isim for u in urunler_db]
 
-            kategoriler_db = db.session.query(Urun.kategori).distinct().order_by(Urun.kategori).all()
+            kategoriler_db = db.session.execute(
+                db.select(Urun.kategori).distinct().order_by(Urun.kategori)
+            ).all()
             kategori_listesi = sorted([k[0] for k in kategoriler_db if k[0]])
 
-            gruplar_db = db.session.query(Urun.kategori_grubu).distinct().order_by(Urun.kategori_grubu).all()
+            gruplar_db = db.session.execute(
+                db.select(Urun.kategori_grubu).distinct().order_by(Urun.kategori_grubu)
+            ).all()
             grup_listesi = sorted([g[0] for g in gruplar_db if g[0]])
 
         except Exception as e:
@@ -765,14 +822,13 @@ def create_app():
                                chart_data=chart_data,
                                analiz_tipi_baslik=analiz_tipi_baslik)
 
-    # --- App'i geri döndür ---
+    # Flask run (lokal) / Render (gunicorn) uyumlu dönüş
     return app
 
 
-# Uygulama nesnesi (Render/gunicorn bunu kullanıyor)
 app = create_app()
 
-# Lokal çalıştırma
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
+    # Prod’da gunicorn kullanın; bu sadece lokal geliştirme içindir
     app.run(host='0.0.0.0', port=port, debug=bool(os.environ.get('FLASK_DEBUG')))
