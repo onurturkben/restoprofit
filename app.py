@@ -1,4 +1,4 @@
-# app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
+# app.py — RestoProfit (optimize, tutarlı ve güvenli sürüm)
 
 import os
 from datetime import datetime, timedelta
@@ -7,7 +7,7 @@ from flask import (
     Flask, render_template, render_template_string, request,
     redirect, url_for, flash, send_from_directory
 )
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from flask_bcrypt import Bcrypt
 from flask_login import (
@@ -134,7 +134,6 @@ def create_app():
 
     @app.errorhandler(404)
     def not_found(_e):
-        # Ayrı bir errors/404.html yoksa base.html ile boş sayfa render
         try:
             return render_template('errors/404.html', title='Bulunamadı'), 404
         except Exception:
@@ -142,11 +141,9 @@ def create_app():
 
     @app.errorhandler(500)
     def server_error(e):
-        # burada log da atılabilir: app.logger.exception(e)
         try:
             return render_template('errors/500.html', title='Sunucu Hatası'), 500
         except Exception:
-            # Temel, geri-dönüş render
             html = """
             {% extends 'base.html' %}
             {% block content %}
@@ -164,9 +161,9 @@ def create_app():
     # -----------------------------------------------------------------------------
     @app.route('/healthz')
     def healthz():
-        # DB ping (opsiyonel)
+        # SQLAlchemy 2.x için text() ile ping
         try:
-            db.session.execute("SELECT 1")
+            db.session.execute(text("SELECT 1"))
         except Exception:
             return ("db_fail", 500)
         return ("ok", 200)
@@ -184,8 +181,11 @@ def create_app():
     def favicon():
         static_fav = os.path.join(app.root_path, 'static', 'favicon.ico')
         if os.path.exists(static_fav):
-            return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico',
-                                       mimetype='image/vnd.microsoft.icon')
+            return send_from_directory(
+                os.path.join(app.root_path, 'static'),
+                'favicon.ico',
+                mimetype='image/vnd.microsoft.icon'
+            )
         return ('', 204)
 
     # -----------------------------------------------------------------------------
@@ -348,44 +348,41 @@ def create_app():
 
         return redirect(url_for('dashboard'))
 
-   from sqlalchemy.orm import joinedload
+    # --- YÖNETİM PANELİ (CRUD) ---
+    @app.route('/admin')
+    @login_required
+    def admin_panel():
+        # URL parametreleri: ?page=2&per=25 gibi
+        page = request.args.get('page', default=1, type=int)
+        per = request.args.get('per', default=25, type=int)
 
-# --- YÖNETİM PANELİ (CRUD) ---
-@app.route('/admin')
-@login_required
-def admin_panel():
-    # URL parametreleri: ?page=2&per=25 gibi
-    page = request.args.get('page', default=1, type=int)
-    per = request.args.get('per', default=25, type=int)
+        try:
+            # Sol üst listeler (tam liste)
+            hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
+            urunler = Urun.query.order_by(Urun.isim).all()
 
-    try:
-        # Sol üst listeler (tam liste)
-        hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
-        urunler = Urun.query.order_by(Urun.isim).all()
+            # Reçeteler için sayfalama
+            recete_query = (Recete.query
+                            .join(Urun, Urun.id == Recete.urun_id)
+                            .join(Hammadde, Hammadde.id == Recete.hammadde_id)
+                            .order_by(Urun.isim, Hammadde.isim))
 
-        # Reçeteler için sayfalama
-        recete_query = (Recete.query
-                        .join(Urun, Urun.id == Recete.urun_id)
-                        .join(Hammadde, Hammadde.id == Recete.hammadde_id)
-                        .order_by(Urun.isim, Hammadde.isim))
+            recete_pagination = recete_query.paginate(page=page, per_page=per, error_out=False)
+            receteler = recete_pagination.items
 
-        recete_pagination = recete_query.paginate(page=page, per_page=per, error_out=False)
-        receteler = recete_pagination.items
+        except Exception as e:
+            flash(f'Veritabanı hatası: {e}', 'danger')
+            hammaddeler, urunler, receteler = [], [], []
+            recete_pagination = None
 
-    except Exception as e:
-        flash(f'Veritabanı hatası: {e}', 'danger')
-        hammaddeler, urunler, receteler = [], [], []
-        recete_pagination = None
-
-    return render_template(
-        'admin.html',
-        title='Menü Yönetimi',
-        hammaddeler=hammaddeler,
-        urunler=urunler,
-        receteler=receteler,
-        recete_pagination=recete_pagination
-    )
-
+        return render_template(
+            'admin.html',
+            title='Menü Yönetimi',
+            hammaddeler=hammaddeler,
+            urunler=urunler,
+            receteler=receteler,
+            recete_pagination=recete_pagination
+        )
 
     # --- Hammadde CRUD ---
     @app.route('/add-material', methods=['POST'])
