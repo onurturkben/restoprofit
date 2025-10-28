@@ -1,214 +1,201 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Analiz Motorları</h1>
-<p class="text-muted mb-4">Fiyat kararlarını sade araçlarla modelleyin.</p>
+<section class="section">
+  <h1>Analiz Motorları</h1>
+  <p class="text-muted">Fiyat kararlarını sade araçlarla modelleyin.</p>
+</section>
 
-<div class="row g-3">
+<!-- GRID: her araç ayrı kart, içinde geniş boşluk -->
+<section class="section">
+  <div class="grid-2">
 
-  <!-- Hedef Marj -->
-  <div class="col-12">
-    <div class="rp-card rp-shadow">
-      <div class="rp-card-body">
-        <h2>Hedef Marj Hesaplayıcı</h2>
-        <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
-          <input type="hidden" name="analiz_tipi" value="hedef_marj">
-          <div class="col-12 col-md-6">
-            <label class="form-label">Ürün</label>
-            <select class="form-select" name="urun_ismi" required>
-              <option value="" disabled selected>Seçin…</option>
-              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-6 col-md-3">
-            <label class="form-label">Hedef Marj (%)</label>
-            <input class="form-control" type="number" name="hedef_marj" value="70" min="1" max="99" step="1" required>
-          </div>
-          <div class="col-6 col-md-3">
-            <button class="btn btn-dark w-100">Hesapla</button>
-          </div>
-        </form>
-
-        {% if aktif_analiz_tipi == 'hedef_marj' and analiz_sonucu %}
-          <hr class="my-4">
-          <div class="d-flex flex-column gap-2">
-            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
-            <div class="text-muted">Sonuç özeti</div>
-            {% if chart_data %}<canvas id="chart-hedef" height="120"></canvas>{% endif %}
-            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Fiyat Simülatörü -->
-  <div class="col-12">
-    <div class="rp-card rp-shadow">
-      <div class="rp-card-body">
-        <h2>Fiyat Simülatörü</h2>
-        <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
-          <input type="hidden" name="analiz_tipi" value="simulasyon">
-          <div class="col-12 col-md-6">
-            <label class="form-label">Ürün</label>
-            <select class="form-select" name="urun_ismi" required>
-              <option value="" disabled selected>Seçin…</option>
-              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-6 col-md-3">
-            <label class="form-label">Yeni Fiyat (TL)</label>
-            <input class="form-control" type="number" name="yeni_fiyat" step="0.5" min="1" required>
-          </div>
-          <div class="col-6 col-md-3">
-            <button class="btn btn-dark w-100">Simüle Et</button>
-          </div>
-        </form>
-
-        {% if aktif_analiz_tipi == 'simulasyon' and analiz_sonucu %}
-          <hr class="my-4">
-          <div class="d-flex flex-column gap-2">
-            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
-            <div class="text-muted">Simülasyon çıktısı</div>
-            {% if chart_data %}<canvas id="chart-sim" height="120"></canvas>{% endif %}
-            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Optimum Fiyat -->
-  <div class="col-12">
-    <div class="rp-card rp-shadow">
-      <div class="rp-card-body">
-        <h2>Optimum Fiyat Motoru</h2>
-        <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
-          <input type="hidden" name="analiz_tipi" value="optimum_fiyat">
-          <div class="col-12 col-md-9">
-            <label class="form-label">Ürün</label>
-            <select class="form-select" name="urun_ismi" required>
-              <option value="" disabled selected>Seçin…</option>
-              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-12 col-md-3">
-            <button class="btn btn-dark w-100">Hesapla</button>
-          </div>
-        </form>
-
-        {% if aktif_analiz_tipi == 'optimum_fiyat' and analiz_sonucu %}
-          <hr class="my-4">
-          <div class="d-flex flex-column gap-2">
-            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
-            <div class="text-muted">Kâr eğrisi ve öneri</div>
-            {% if chart_data %}<canvas id="chart-opt" height="120"></canvas>{% endif %}
-            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Stratejik Analiz -->
-  <div class="col-12">
-    <div class="rp-card rp-shadow">
-      <div class="rp-card-body">
-        <h2>Stratejik Analiz</h2>
+    <!-- Hedef Marj -->
+    <div class="rp-card">
+      <h2>Hedef Marj Hesaplayıcı</h2>
+      <form action="{{ url_for('reports') }}" method="POST" class="mt-3">
+        <input type="hidden" name="analiz_tipi" value="hedef_marj">
         <div class="row g-3">
-          <form action="{{ url_for('reports') }}" method="POST" class="col-12 col-lg-6">
-            <input type="hidden" name="analiz_tipi" value="kategori">
-            <label class="form-label">Kategori</label>
-            <div class="row g-2">
-              <div class="col-12">
-                <select class="form-select" name="kategori_ismi" required>
-                  <option value="" disabled selected>Seçin…</option>
-                  {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-6 col-md-4">
-                <label class="form-label">Gün</label>
-                <input class="form-control" type="number" name="gun_sayisi" value="7" min="1" step="1" required>
-              </div>
-              <div class="col-12 col-md-8">
-                <button class="btn btn-dark w-100">Kategori Analizi</button>
-              </div>
-            </div>
-          </form>
-
-          <form action="{{ url_for('reports') }}" method="POST" class="col-12 col-lg-6">
-            <input type="hidden" name="analiz_tipi" value="grup">
-            <label class="form-label">Grup</label>
-            <div class="row g-2">
-              <div class="col-12">
-                <select class="form-select" name="grup_ismi" required>
-                  <option value="" disabled selected>Seçin…</option>
-                  {% for grup in grup_listesi %}<option value="{{ grup }}">{{ grup }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="col-6 col-md-4">
-                <label class="form-label">Gün</label>
-                <input class="form-control" type="number" name="gun_sayisi" value="7" min="1" step="1" required>
-              </div>
-              <div class="col-12 col-md-8">
-                <button class="btn btn-dark w-100">Grup Analizi</button>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {% if aktif_analiz_tipi in ['kategori','grup'] and analiz_sonucu %}
-          <hr class="my-4">
-          <div class="d-flex flex-column gap-2">
-            <h3 class="m-0">{{ analiz_tipi_baslik }}</h3>
-            <div class="text-muted">Pay dağılımı</div>
-            {% if chart_data %}<canvas id="chart-str" height="140"></canvas>{% endif %}
-            <pre class="mb-0 mt-2" style="background:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
+          <div class="col-12 col-lg-7">
+            <label class="form-label">Ürün</label>
+            <select class="form-select" name="urun_ismi" required>
+              <option value="" disabled selected>Seçin...</option>
+              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            </select>
           </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
+          <div class="col-12 col-lg-5">
+            <label class="form-label">Hedef Marj (%)</label>
+            <input type="number" class="form-control" name="hedef_marj" value="70" min="1" max="99" step="1" required>
+          </div>
+        </div>
+        <div class="form-actions d-grid d-lg-flex justify-content-end">
+          <button type="submit" class="btn btn-dark px-4">Hesapla</button>
+        </div>
+      </form>
 
-</div>
+      {% if aktif_analiz_tipi == 'hedef_marj' and analiz_sonucu_clean %}
+      <div class="result-card mt-4">
+        <h3>Sonuç özeti</h3>
+        <pre class="result-pre">{{ analiz_sonucu_clean }}</pre>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Fiyat Simülatörü -->
+    <div class="rp-card">
+      <h2>Fiyat Simülatörü</h2>
+      <form action="{{ url_for('reports') }}" method="POST" class="mt-3">
+        <input type="hidden" name="analiz_tipi" value="simulasyon">
+        <div class="row g-3">
+          <div class="col-12 col-lg-7">
+            <label class="form-label">Ürün</label>
+            <select class="form-select" name="urun_ismi" required>
+              <option value="" disabled selected>Seçin...</option>
+              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-lg-5">
+            <label class="form-label">Yeni Fiyat (TL)</label>
+            <input type="number" class="form-control" name="yeni_fiyat" placeholder="Örn: 150" step="0.5" min="1" required>
+          </div>
+        </div>
+        <div class="form-actions d-grid d-lg-flex justify-content-end">
+          <button type="submit" class="btn btn-dark px-4">Simüle Et</button>
+        </div>
+      </form>
+
+      {% if aktif_analiz_tipi == 'simulasyon' and analiz_sonucu_clean %}
+      <div class="result-card mt-4">
+        <h3>Sonuç özeti</h3>
+        <pre class="result-pre">{{ analiz_sonucu_clean }}</pre>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Optimum Fiyat -->
+    <div class="rp-card">
+      <h2>Optimum Fiyat Motoru</h2>
+      <form action="{{ url_for('reports') }}" method="POST" class="mt-3">
+        <input type="hidden" name="analiz_tipi" value="optimum_fiyat">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Ürün</label>
+            <select class="form-select" name="urun_ismi" required>
+              <option value="" disabled selected>Seçin...</option>
+              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-actions d-grid d-lg-flex justify-content-end">
+          <button type="submit" class="btn btn-dark px-4">Hesapla</button>
+        </div>
+      </form>
+
+      {% if aktif_analiz_tipi == 'optimum_fiyat' and analiz_sonucu_clean %}
+      <div class="result-card mt-4">
+        <h3>Sonuç özeti</h3>
+        <pre class="result-pre">{{ analiz_sonucu_clean }}</pre>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Stratejik Analiz -->
+    <div class="rp-card">
+      <h2>Stratejik Analiz</h2>
+      <div class="text-muted mb-2">Ürünlerin kategori ve grup bazında etkisini değerlendirin.</div>
+
+      <!-- Kategori -->
+      <form action="{{ url_for('reports') }}" method="POST" class="mt-3 border-bottom pb-3">
+        <input type="hidden" name="analiz_tipi" value="kategori">
+        <div class="row g-3">
+          <div class="col-12 col-lg-7">
+            <label class="form-label">Kategori</label>
+            <select class="form-select" name="kategori_ismi" required>
+              <option value="" disabled selected>Seçin...</option>
+              {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-lg-5">
+            <label class="form-label">Gün</label>
+            <input type="number" class="form-control" name="gun_sayisi" value="7" min="1" step="1" required>
+          </div>
+        </div>
+        <div class="form-actions d-grid d-lg-flex justify-content-end">
+          <button type="submit" class="btn btn-dark px-4">Kategori Analizi</button>
+        </div>
+      </form>
+
+      {% if aktif_analiz_tipi == 'kategori' and analiz_sonucu_clean %}
+      <div class="result-card mt-4">
+        <h3>Sonuç özeti</h3>
+        <pre class="result-pre">{{ analiz_sonucu_clean }}</pre>
+      </div>
+      {% endif %}
+
+      <!-- Grup -->
+      <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
+        <input type="hidden" name="analiz_tipi" value="grup">
+        <div class="row g-3">
+          <div class="col-12 col-lg-7">
+            <label class="form-label">Grup</label>
+            <select class="form-select" name="grup_ismi" required>
+              <option value="" disabled selected>Seçin...</option>
+              {% for grup in grup_listesi %}<option value="{{ grup }}">{{ grup }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-lg-5">
+            <label class="form-label">Gün</label>
+            <input type="number" class="form-control" name="gun_sayisi" value="7" min="1" step="1" required>
+          </div>
+        </div>
+        <div class="form-actions d-grid d-lg-flex justify-content-end">
+          <button type="submit" class="btn btn-dark px-4">Grup Analizi</button>
+        </div>
+      </form>
+
+      {% if aktif_analiz_tipi == 'grup' and analiz_sonucu_clean %}
+      <div class="result-card mt-4">
+        <h3>Sonuç özeti</h3>
+        <pre class="result-pre">{{ analiz_sonucu_clean }}</pre>
+      </div>
+      {% endif %}
+
+      {% if chart_data %}
+      <div class="result-card mt-4">
+        <canvas id="myChart"></canvas>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-{% if chart_data and aktif_analiz_tipi %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-(function(){
-  try{
-    const data = JSON.parse({{ (chart_data or 'null')|tojson|safe }});
-    if(!data) return;
-
-    // Hangi form çalıştıysa o kartın içindeki canvas'ı hedefle
-    const idMap = {
-      'hedef_marj':'chart-hedef',
-      'simulasyon':'chart-sim',
-      'optimum_fiyat':'chart-opt',
-      'kategori':'chart-str',
-      'grup':'chart-str'
-    };
-    const targetId = idMap['{{ aktif_analiz_tipi }}'];
-    const el = document.getElementById(targetId);
-    if(!el) return;
-
-    const type = (data.datasets && data.datasets.length>1) ? 'bar' : 'line';
-    new Chart(el.getContext('2d'), {
-      type, data,
-      options:{
-        responsive:true,
-        plugins:{ legend:{position:'top'}, title:{display:false}},
-        scales: type==='line' ? {
-          x:{ title:{display:true, text:'Satış Fiyatı (TL)'} },
-          y:{ title:{display:true, text:'Tahmini Toplam Kâr (TL)'} }
-        } : {}
-      }
-    });
-  }catch(e){ console.error(e); }
-})();
+  // Chart varsa çiz
+  (function(){
+    const el = document.getElementById('myChart');
+    {% if chart_data %}
+      try {
+        const chartData = JSON.parse({{ chart_data|tojson|safe }});
+        if (!chartData || !chartData.datasets) return;
+        const type = (chartData.datasets.length > 1) ? 'bar' : 'line';
+        new Chart(el.getContext('2d'), {
+          type,
+          data: chartData,
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'top' },
+              title: { display: true, text: '{{ analiz_tipi_baslik|default("Analiz Grafiği") }}' }
+            }
+          }
+        });
+      } catch(e){ console.error(e); }
+    {% endif %}
+  })();
 </script>
-{% endif %}
 {% endblock %}
