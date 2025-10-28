@@ -839,6 +839,7 @@ def create_app():
             kategori_listesi=kategori_listesi,
             grup_listesi=grup_listesi,
             analiz_sonucu=analiz_sonucu,
+            analiz_sonucu_clean=strip_emojis(analiz_sonucu) if analiz_sonucu else None,
             chart_data=chart_data,
             analiz_tipi_baslik=analiz_tipi_baslik,
             aktif_analiz_tipi=analiz_tipi if request.method == 'POST' else None
