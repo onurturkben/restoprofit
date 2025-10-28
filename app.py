@@ -720,34 +720,43 @@ def create_app():
             flash(f"Silme hatası: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
-    # --- Raporlar ---
+
+    # --- RAPORLAR / ANALİZ MOTORLARI ---
     @app.route('/reports', methods=['GET', 'POST'])
     @login_required
     def reports():
+        # Seçim listeleri (ürün / kategori / grup)
         try:
-            urunler_db = db.session.scalars(
-                db.select(Urun).order_by(Urun.isim)
-            ).all()
+            urunler_db = Urun.query.order_by(Urun.isim).all()
             urun_listesi = [u.isim for u in urunler_db]
 
-            kategoriler_db = db.session.execute(
-                db.select(Urun.kategori).distinct().order_by(Urun.kategori)
-            ).all()
+            kategoriler_db = (
+                db.session.query(Urun.kategori)
+                .distinct()
+                .order_by(Urun.kategori)
+                .all()
+            )
             kategori_listesi = sorted([k[0] for k in kategoriler_db if k[0]])
 
-            gruplar_db = db.session.execute(
-                db.select(Urun.kategori_grubu).distinct().order_by(Urun.kategori_grubu)
-            ).all()
+            gruplar_db = (
+                db.session.query(Urun.kategori_grubu)
+                .distinct()
+                .order_by(Urun.kategori_grubu)
+                .all()
+            )
             grup_listesi = sorted([g[0] for g in gruplar_db if g[0]])
 
         except Exception as e:
             flash(f'Veritabanından listeler çekilirken hata: {e}', 'danger')
             urun_listesi, kategori_listesi, grup_listesi = [], [], []
 
+        # Çıktı & durum değişkenleri
         analiz_sonucu = None
         chart_data = None
         analiz_tipi_baslik = ""
+        analiz_tipi = None  # güvenli varsayılan
 
+        # POST ise analiz yap
         if request.method == 'POST':
             try:
                 analiz_tipi = request.form.get('analiz_tipi')
@@ -814,18 +823,25 @@ def create_app():
                 analiz_sonucu = None
                 chart_data = None
 
-        return render_template('reports.html', title='Analiz Motorları',
-                               urun_listesi=urun_listesi,
-                               kategori_listesi=kategori_listesi,
-                               grup_listesi=grup_listesi,
-                               analiz_sonucu=analiz_sonucu,
-                               chart_data=chart_data,
-                               analiz_tipi_baslik=analiz_tipi_baslik)
+        # SAYFA DÖNÜŞÜ
+        return render_template(
+            'reports.html',
+            title='Analiz Motorları',
+            urun_listesi=urun_listesi,
+            kategori_listesi=kategori_listesi,
+            grup_listesi=grup_listesi,
+            analiz_sonucu=analiz_sonucu,
+            chart_data=chart_data,
+            analiz_tipi_baslik=analiz_tipi_baslik,
+            aktif_analiz_tipi=analiz_tipi if request.method == 'POST' else None
+        )
+
 
     # Flask run (lokal) / Render (gunicorn) uyumlu dönüş
     return app
 
 
+# --- Ana uygulama çalıştırma ---
 app = create_app()
 
 if __name__ == '__main__':
