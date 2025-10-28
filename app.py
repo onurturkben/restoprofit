@@ -348,23 +348,53 @@ def create_app():
 
         return redirect(url_for('dashboard'))
 
-    # Yönetim paneli
-    @app.route('/admin')
-    @login_required
-    def admin_panel():
-        try:
-            hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
-            urunler = Urun.query.order_by(Urun.isim).all()
-            receteler = (Recete.query
-                         .join(Urun, Urun.id == Recete.urun_id)
-                         .join(Hammadde, Hammadde.id == Recete.hammadde_id)
-                         .order_by(Urun.isim, Hammadde.isim)
-                         .all())
-        except Exception as e:
-            flash(f'Veritabanı hatası: {e}', 'danger')
-            hammaddeler, urunler, receteler = [], [], []
-        return render_template('admin.html', title='Menü Yönetimi',
-                               hammaddeler=hammaddeler, urunler=urunler, receteler=receteler)
+   from sqlalchemy.orm import joinedload
+
+@app.route('/admin')
+@login_required
+def admin_panel():
+    try:
+        hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
+        urunler = Urun.query.order_by(Urun.isim).all()
+
+        page = int(request.args.get('page', 1))
+        per_page = min(max(int(request.args.get('per', 100)), 20), 500)
+
+        receteler_query = Recete.query.options(
+            joinedload(Recete.urun),
+            joinedload(Recete.hammadde)
+        ).order_by(Recete.urun_id.asc(), Recete.hammadde_id.asc())
+
+        receteler_paginated = receteler_query.paginate(page=page, per_page=per_page, error_out=False)
+
+        return render_template(
+            'admin.html',
+            title='Menü Yönetimi',
+            hammaddeler=hammaddeler,
+            urunler=urunler,
+            receteler=receteler_paginated.items,
+            recete_pagination={
+                "page": receteler_paginated.page,
+                "pages": receteler_paginated.pages,
+                "per_page": receteler_paginated.per_page,
+                "total": receteler_paginated.total,
+                "has_next": receteler_paginated.has_next,
+                "has_prev": receteler_paginated.has_prev,
+                "next_num": receteler_paginated.next_num,
+                "prev_num": receteler_paginated.prev_num,
+            }
+        )
+    except Exception as e:
+        flash(f'Veritabanı hatası: {e}', 'danger')
+        return render_template(
+            'admin.html',
+            title='Menü Yönetimi',
+            hammaddeler=[],
+            urunler=[],
+            receteler=[],
+            recete_pagination=None
+        )
+
 
     # --- Hammadde CRUD ---
     @app.route('/add-material', methods=['POST'])
