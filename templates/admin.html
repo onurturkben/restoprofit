@@ -321,6 +321,22 @@
         </div>
       </div>
     </div>
+    {% if recete_pagination %}
+<nav aria-label="Reçete sayfalama" class="mt-3">
+  <ul class="pagination pagination-sm justify-content-end">
+    <li class="page-item {% if not recete_pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('admin_panel', page=recete_pagination.prev_num, per=recete_pagination.per_page) }}">Önceki</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link">
+      Sayfa {{ recete_pagination.page }} / {{ recete_pagination.pages }}
+    </span></li>
+    <li class="page-item {% if not recete_pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('admin_panel', page=recete_pagination.next_num, per=recete_pagination.per_page) }}">Sonraki</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
 
     <hr class="my-5 border-danger">
 
