@@ -42,6 +42,14 @@ from analysis_engine import (
     bul_optimum_fiyat,
     analiz_et_kategori_veya_grup
 )
+import re
+
+EMOJI_RX = re.compile(r'[\U0001F300-\U0001FAFF\U00002700-\U000027BF]+', flags=re.UNICODE)
+
+def strip_emojis(text: str) -> str:
+    if not isinstance(text, str):
+        return text
+    return EMOJI_RX.sub('', text).strip()
 
 # -----------------------------------------------------------------------------
 # Yardımcılar
