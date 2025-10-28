@@ -1,4 +1,4 @@
-# app.py — RestoProfit (optimize, tutarlı ve güvenli sürüm)
+# app.py — RestoProfit (temiz, optimize ve düzgün girintili sürüm)
 
 import os
 from datetime import datetime, timedelta
@@ -7,17 +7,22 @@ from flask import (
     Flask, render_template, render_template_string, request,
     redirect, url_for, flash, send_from_directory
 )
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 
+# database.py içinde şu sembollerin tanımlı olduğundan emin ol:
+# db, init_db, Hammadde, Urun, Recete, SatisKaydi, User, guncelle_tum_urun_maliyetleri
 from database import (
     db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
     guncelle_tum_urun_maliyetleri
 )
+
+# Analiz motorları
 from analysis_engine import (
     hesapla_hedef_marj,
     simule_et_fiyat_degisikligi,
@@ -66,7 +71,9 @@ class Config:
         "pool_recycle": 300,
     }
 
-
+# -----------------------------------------------------------------------------
+# App Factory
+# -----------------------------------------------------------------------------
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -88,32 +95,29 @@ def create_app():
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
-   # --- Admin kullanıcı sıfırlama / oluşturma ---
-with app.app_context():
-    db.create_all()
+    # --- Admin kullanıcı sıfırlama / oluşturma ---
+    with app.app_context():
+        db.create_all()
 
-    from flask_bcrypt import Bcrypt
-    bcrypt = Bcrypt(app)
+        ADMIN_USERNAME = "onur"
+        ADMIN_PASSWORD = "RestoranSifrem!2025"
 
-    ADMIN_USERNAME = "onur"
-    ADMIN_PASSWORD = "RestoranSifrem!2025"
+        try:
+            admin = User.query.filter_by(username=ADMIN_USERNAME).first()
+            hashed_password = bcrypt.generate_password_hash(ADMIN_PASSWORD).decode('utf-8')
 
-    try:
-        admin = User.query.filter_by(username=ADMIN_USERNAME).first()
-        hashed_password = bcrypt.generate_password_hash(ADMIN_PASSWORD).decode('utf-8')
-
-        if not admin:
-            admin = User(username=ADMIN_USERNAME, password_hash=hashed_password)
-            db.session.add(admin)
-            db.session.commit()
-            print(f"[INIT] Yeni admin oluşturuldu: {ADMIN_USERNAME}")
-        else:
-            admin.password_hash = hashed_password
-            db.session.commit()
-            print(f"[INIT] Admin şifresi sıfırlandı: {ADMIN_USERNAME}")
-    except Exception as e:
-        db.session.rollback()
-        print(f"[INIT ERROR] Admin oluşturulamadı veya sıfırlanamadı: {e}")
+            if not admin:
+                admin = User(username=ADMIN_USERNAME, password_hash=hashed_password)
+                db.session.add(admin)
+                db.session.commit()
+                print(f"[INIT] Yeni admin oluşturuldu: {ADMIN_USERNAME}")
+            else:
+                admin.password_hash = hashed_password
+                db.session.commit()
+                print(f"[INIT] Admin şifresi sıfırlandı: {ADMIN_USERNAME}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[INIT ERROR] Admin oluşturulamadı veya sıfırlanamadı: {e}")
 
     # Global template değişkenleri
     @app.context_processor
@@ -146,13 +150,14 @@ with app.app_context():
 
     @app.errorhandler(404)
     def not_found(_e):
+        # Ayrı bir errors/404.html yoksa base.html ile sade sayfa
         try:
             return render_template('errors/404.html', title='Bulunamadı'), 404
         except Exception:
             return render_template('base.html', title='Bulunamadı'), 404
 
     @app.errorhandler(500)
-    def server_error(e):
+    def server_error(_e):
         try:
             return render_template('errors/500.html', title='Sunucu Hatası'), 500
         except Exception:
@@ -173,9 +178,8 @@ with app.app_context():
     # -----------------------------------------------------------------------------
     @app.route('/healthz')
     def healthz():
-        # SQLAlchemy 2.x için text() ile ping
         try:
-            db.session.execute(text("SELECT 1"))
+            db.session.execute("SELECT 1")
         except Exception:
             return ("db_fail", 500)
         return ("ok", 200)
@@ -193,11 +197,8 @@ with app.app_context():
     def favicon():
         static_fav = os.path.join(app.root_path, 'static', 'favicon.ico')
         if os.path.exists(static_fav):
-            return send_from_directory(
-                os.path.join(app.root_path, 'static'),
-                'favicon.ico',
-                mimetype='image/vnd.microsoft.icon'
-            )
+            return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico',
+                                       mimetype='image/vnd.microsoft.icon')
         return ('', 204)
 
     # -----------------------------------------------------------------------------
@@ -229,7 +230,7 @@ with app.app_context():
         flash('Başarıyla çıkış yaptınız.', 'info')
         return redirect(url_for('login'))
 
-    # Şifre Değiştir (TEK sürüm)
+    # Şifre Değiştir
     @app.route('/change-password', methods=['GET', 'POST'])
     @login_required
     def change_password():
@@ -364,17 +365,15 @@ with app.app_context():
     @app.route('/admin')
     @login_required
     def admin_panel():
-        # URL parametreleri: ?page=2&per=25 gibi
         page = request.args.get('page', default=1, type=int)
         per = request.args.get('per', default=25, type=int)
 
         try:
-            # Sol üst listeler (tam liste)
             hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
             urunler = Urun.query.order_by(Urun.isim).all()
 
-            # Reçeteler için sayfalama
             recete_query = (Recete.query
+                            .options(joinedload(Recete.urun), joinedload(Recete.hammadde))
                             .join(Urun, Urun.id == Recete.urun_id)
                             .join(Hammadde, Hammadde.id == Recete.hammadde_id)
                             .order_by(Urun.isim, Hammadde.isim))
@@ -766,13 +765,14 @@ with app.app_context():
                                chart_data=chart_data,
                                analiz_tipi_baslik=analiz_tipi_baslik)
 
-    # Flask run (lokal) / Render (gunicorn) uyumlu dönüş
+    # --- App'i geri döndür ---
     return app
 
 
+# Uygulama nesnesi (Render/gunicorn bunu kullanıyor)
 app = create_app()
 
+# Lokal çalıştırma
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    # Prod’da gunicorn kullanın; bu sadece lokal geliştirme içindir
     app.run(host='0.0.0.0', port=port, debug=bool(os.environ.get('FLASK_DEBUG')))
