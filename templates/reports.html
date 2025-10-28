@@ -3,7 +3,6 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-10 col-xl-8">
-
     <div class="text-center">
       <h1>Analiz Motorları</h1>
       <p class="lead text-muted mb-5">
@@ -12,20 +11,18 @@
     </div>
 
     <!-- Motor 1: Hedef Marj Hesaplayıcı -->
-    <section class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4">
       <div class="card-body p-4 p-lg-5">
         <h3 class="mb-3"><i class="bi bi-bullseye text-primary"></i> Hedef Marj Hesaplayıcı</h3>
-        <p class="text-muted">Bir ürünün maliyetine göre, istediğiniz kâr marjı için gereken satış fiyatını hesaplar.</p>
+        <p class="text-muted">Bir ürünün maliyetine göre istediğiniz kar marjı için gereken satış fiyatını hesaplar.</p>
         <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
           <input type="hidden" name="analiz_tipi" value="hedef_marj">
           <div class="row g-3 align-items-end">
             <div class="col-sm-6">
-              <label for="hedef_urun" class="form-label">Ürün Seçin</label>
+              <label for="hedef_urun" class="form-label">Ürün</label>
               <select class="form-select" name="urun_ismi" id="hedef_urun" required>
                 <option value="" disabled selected>Bir ürün seçin...</option>
-                {% for urun in urun_listesi %}
-                  <option value="{{ urun }}">{{ urun }}</option>
-                {% endfor %}
+                {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-sm-3">
@@ -38,13 +35,13 @@
           </div>
         </form>
       </div>
-    </section>
+    </div>
 
     <!-- Motor 2: Fiyat Simülatörü -->
     <section class="card shadow-sm mb-4">
       <div class="card-body p-4 p-lg-5">
         <h3 class="mb-3"><i class="bi bi-graph-up-arrow"></i> Fiyat Simülatörü</h3>
-        <p class="text-muted">“Ya bu fiyata çekersek?” – Fiyat değiştirdiğinizde tahmini satış ve kâr etkisini hesaplar.</p>
+        <p class="text-muted">“Ya fiyatı değiştirirsem?” sorusuna tahmini kâr etkisini gösterir.</p>
         <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
           <input type="hidden" name="analiz_tipi" value="simulasyon">
           <div class="row g-3 align-items-end">
@@ -52,14 +49,12 @@
               <label for="sim_urun" class="form-label">Ürün</label>
               <select class="form-select" name="urun_ismi" id="sim_urun" required>
                 <option value="" disabled selected>Bir ürün seçin...</option>
-                {% for urun in urun_listesi %}
-                  <option value="{{ urun }}">{{ urun }}</option>
-                {% endfor %}
+                {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-sm-3">
               <label for="yeni_fiyat" class="form-label">Yeni Fiyat (TL)</label>
-              <input type="number" class="form-control" name="yeni_fiyat" id="yeni_fiyat" placeholder="Örn: 150" step="0.5" min="0.01" required>
+              <input type="number" class="form-control" name="yeni_fiyat" id="yeni_fiyat" placeholder="Örn: 150" step="0.5" min="1" required>
             </div>
             <div class="col-sm-3">
               <button type="submit" class="btn btn-dark w-100">Simüle Et</button>
@@ -69,10 +64,10 @@
       </div>
     </section>
 
-    <!-- Motor 3: Optimum Fiyat Motoru -->
+    <!-- Motor 3: Optimum Fiyat -->
     <section class="card shadow-sm mb-4">
       <div class="card-body p-4 p-lg-5">
-        <h3 class="mb-3"><i class="bi bi-gem"></i> Optimum Fiyat Motoru</h3>
+        <h3 class="mb-3"><i class="bi bi-gem"></i> Optimum Fiyat</h3>
         <p class="text-muted">Geçmiş veriye göre maksimum kâr getirecek fiyatı tahmin eder.</p>
         <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
           <input type="hidden" name="analiz_tipi" value="optimum_fiyat">
@@ -81,9 +76,7 @@
               <label for="opt_urun" class="form-label">Ürün</label>
               <select class="form-select" name="urun_ismi" id="opt_urun" required>
                 <option value="" disabled selected>Bir ürün seçin...</option>
-                {% for urun in urun_listesi %}
-                  <option value="{{ urun }}">{{ urun }}</option>
-                {% endfor %}
+                {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-sm-3">
@@ -94,13 +87,13 @@
       </div>
     </section>
 
-    <!-- Motor 4 & 5: Stratejik Analiz (Kategori / Grup) -->
+    <!-- Motor 4/5: Stratejik Analiz (Kategori / Grup) -->
     <section class="card shadow-sm mb-5">
       <div class="card-body p-4 p-lg-5">
-        <h3 class="mb-3"><i class="bi bi-diagram-3"></i> Stratejik Analiz</h3>
-        <p class="text-muted">Ürünlerin birbirini nasıl etkilediğini (yamyamlık) kategori veya grup bazında karşılaştırın.</p>
+        <h3><i class="bi bi-diagram-3"></i> Stratejik Analiz</h3>
+        <p class="text-muted">Kategori veya grup bazında kâr dağılımını ve değişimi inceler.</p>
 
-        <!-- Kategori Analizi -->
+        <!-- Kategori -->
         <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
           <input type="hidden" name="analiz_tipi" value="kategori">
           <div class="row g-3 align-items-end">
@@ -108,9 +101,7 @@
               <label for="kategori_isim" class="form-label">Kategori</label>
               <select class="form-select" name="kategori_ismi" id="kategori_isim" required>
                 <option value="" disabled selected>Bir kategori seçin...</option>
-                {% for kat in kategori_listesi %}
-                  <option value="{{ kat }}">{{ kat }}</option>
-                {% endfor %}
+                {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-sm-3">
@@ -123,7 +114,7 @@
           </div>
         </form>
 
-        <!-- Grup Analizi -->
+        <!-- Grup -->
         <form action="{{ url_for('reports') }}" method="POST" class="mt-3 pt-3 border-top">
           <input type="hidden" name="analiz_tipi" value="grup">
           <div class="row g-3 align-items-end">
@@ -131,9 +122,7 @@
               <label for="grup_isim" class="form-label">Grup</label>
               <select class="form-select" name="grup_ismi" id="grup_isim" required>
                 <option value="" disabled selected>Bir grup seçin...</option>
-                {% for grup in grup_listesi %}
-                  <option value="{{ grup }}">{{ grup }}</option>
-                {% endfor %}
+                {% for g in grup_listesi %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-sm-3">
@@ -150,22 +139,21 @@
 
     <!-- Analiz Sonucu -->
     {% if analiz_sonucu %}
-    <section class="mb-5">
+    <div class="mb-5">
       <h2 class="mb-4">Analiz Sonucu: {{ analiz_tipi_baslik }}</h2>
       <div class="card shadow-sm">
         <div class="card-body p-4">
           {% if chart_data %}
           <div class="mb-4">
-            <canvas id="myChart" aria-label="Analiz grafiği" role="img"></canvas>
+            <canvas id="myChart" height="120"></canvas>
           </div>
-          <hr class="my-4">
+          <hr class="my-3">
           {% endif %}
-          <pre class="mb-0" style="background-color:#fff;border:none;padding:0;white-space:pre-wrap">{{ analiz_sonucu }}</pre>
+          <pre class="mb-0" style="background-color:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
         </div>
       </div>
-    </section>
+    </div>
     {% endif %}
-
   </div>
 </div>
 {% endblock %}
@@ -173,40 +161,33 @@
 {% block scripts %}
 {{ super() }}
 <script>
-/**
- * Chart çizimi:
- * - Backend (analysis_engine) her analiz için tek JSON sözleşmesi döndürüyor:
- *   { labels: [...], datasets: [...] }
- * - datasets.length > 1 => bar; aksi halde line.
- */
-(function () {
-  const el = document.getElementById('myChart');
-  if (!el) return;
-
+(function() {
+  const canvas = document.getElementById('myChart');
+  if (!canvas) return;
   try {
-    const chartData = JSON.parse({{ (chart_data or 'null') | tojson | safe }});
-    if (!chartData || !chartData.datasets) return;
+    const raw = {{ (chart_data or 'null') | tojson | safe }};
+    if (!raw) return; // grafik yok
 
-    const type = (chartData.datasets.length > 1) ? 'bar' : 'line';
-    new Chart(el.getContext('2d'), {
+    // raw zaten Chart.js şeması: { labels: [...], datasets: [...] }
+    const type = (raw.datasets && raw.datasets.length > 1) ? 'bar' : 'line';
+
+    new Chart(canvas.getContext('2d'), {
       type,
-      data: chartData,
+      data: raw,
       options: {
         responsive: true,
         plugins: {
           legend: { position: 'top' },
-          title: { display: true, text: {{ (analiz_tipi_baslik or 'Analiz Grafiği') | tojson }} }
+          title: { display: true, text: '{{ analiz_tipi_baslik|default("Analiz Grafiği") }}' }
         },
-        scales: (type === 'line')
-          ? {
-              x: { title: { display: true, text: 'Satış Fiyatı (TL)' } },
-              y: { title: { display: true, text: 'Tahmini Toplam Kâr (TL)' } }
-            }
-          : {}
+        scales: (type === 'line') ? {
+          x: { title: { display: true, text: 'Fiyat / Grup' } },
+          y: { title: { display: true, text: 'Tahmini Toplam Kâr (TL)' } }
+        } : {}
       }
     });
   } catch (e) {
-    console.error('Grafik verisi ayrıştırılamadı:', e);
+    console.error('Grafik verisi çizilemedi:', e);
   }
 })();
 </script>
