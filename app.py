@@ -88,20 +88,32 @@ def create_app():
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
-    # İlk admin (ENV ile override edilebilir)
-    with app.app_context():
-        db.create_all()
-        if not User.query.first():
-            admin_user = os.environ.get('ADMIN_USER', 'onur')
-            admin_pass = os.environ.get('ADMIN_PASS', 'RestoranSifrem!2025')
-            try:
-                hashed_password = bcrypt.generate_password_hash(admin_pass).decode('utf-8')
-                db.session.add(User(username=admin_user, password_hash=hashed_password))
-                db.session.commit()
-                print(f"[INIT] Admin oluşturuldu -> kullanıcı: {admin_user}")
-            except Exception as e:
-                db.session.rollback()
-                print(f"[INIT] Admin oluşturulamadı: {e}")
+   # --- Admin kullanıcı sıfırlama / oluşturma ---
+with app.app_context():
+    db.create_all()
+
+    from flask_bcrypt import Bcrypt
+    bcrypt = Bcrypt(app)
+
+    ADMIN_USERNAME = "onur"
+    ADMIN_PASSWORD = "RestoranSifrem!2025"
+
+    try:
+        admin = User.query.filter_by(username=ADMIN_USERNAME).first()
+        hashed_password = bcrypt.generate_password_hash(ADMIN_PASSWORD).decode('utf-8')
+
+        if not admin:
+            admin = User(username=ADMIN_USERNAME, password_hash=hashed_password)
+            db.session.add(admin)
+            db.session.commit()
+            print(f"[INIT] Yeni admin oluşturuldu: {ADMIN_USERNAME}")
+        else:
+            admin.password_hash = hashed_password
+            db.session.commit()
+            print(f"[INIT] Admin şifresi sıfırlandı: {ADMIN_USERNAME}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"[INIT ERROR] Admin oluşturulamadı veya sıfırlanamadı: {e}")
 
     # Global template değişkenleri
     @app.context_processor
