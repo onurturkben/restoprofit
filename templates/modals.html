@@ -1,0 +1,120 @@
+{# Bootstrap 5 modalları – Hammadde / Ürün / Reçete ekleme #}
+
+<!-- Hammadde Ekle -->
+<div class="modal fade" id="modalAddMaterial" tabindex="-1" aria-labelledby="modalAddMaterialLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="POST" action="{{ url_for('add_material') }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalAddMaterialLabel"><i class="bi bi-box-seam"></i> Hammadde Ekle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="h_isim">İsim</label>
+          <input class="form-control" type="text" id="h_isim" name="h_isim" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="h_birim">Birim (kg, g, L, ml, adet...)</label>
+          <input class="form-control" type="text" id="h_birim" name="h_birim" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="h_fiyat">Birim Fiyatı (TL)</label>
+          <input class="form-control" type="number" step="0.01" min="0" id="h_fiyat" name="h_fiyat" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Vazgeç</button>
+        <button type="submit" class="btn btn-primary">Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Ürün Ekle -->
+<div class="modal fade" id="modalAddProduct" tabindex="-1" aria-labelledby="modalAddProductLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="POST" action="{{ url_for('add_product') }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalAddProductLabel"><i class="bi bi-basket3"></i> Ürün Ekle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="u_isim">Ürün Adı</label>
+          <input class="form-control" type="text" id="u_isim" name="u_isim" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="u_excel_adi">Excel Adı (rapordaki ad ile birebir)</label>
+          <input class="form-control" type="text" id="u_excel_adi" name="u_excel_adi" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="u_fiyat">Mevcut Satış Fiyatı (TL)</label>
+          <input class="form-control" type="number" step="0.01" min="0" id="u_fiyat" name="u_fiyat" required>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="u_kategori">Kategori</label>
+            <input class="form-control" type="text" id="u_kategori" name="u_kategori" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="u_grup">Kategori Grubu</label>
+            <input class="form-control" type="text" id="u_grup" name="u_grup" required>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Vazgeç</button>
+        <button type="submit" class="btn btn-primary">Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reçete Kalemi Ekle -->
+<div class="modal fade" id="modalAddRecipe" tabindex="-1" aria-labelledby="modalAddRecipeLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="POST" action="{{ url_for('add_recipe') }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalAddRecipeLabel"><i class="bi bi-journal-plus"></i> Reçete Kalemi Ekle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" for="r_urun_id">Ürün</label>
+          <select class="form-select" id="r_urun_id" name="r_urun_id" required>
+            <option value="" disabled selected>Bir ürün seçin…</option>
+            {% for u in urunler %}
+              <option value="{{ u.id }}">{{ u.isim }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="r_hammadde_id">Hammadde</label>
+          <select class="form-select" id="r_hammadde_id" name="r_hammadde_id" required>
+            <option value="" disabled selected>Bir hammadde seçin…</option>
+            {% for h in hammaddeler %}
+              <option value="{{ h.id }}">{{ h.isim }} ({{ h.maliyet_birimi }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="r_miktar">Miktar</label>
+          <input class="form-control" type="number" step="0.0001" min="0" id="r_miktar" name="r_miktar" placeholder="Örn: 0.035" required>
+          <small class="text-muted">Kullanılan birim, hammaddenin birimiyle aynı olmalı (ör. kg, L, adet).</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Vazgeç</button>
+        <button type="submit" class="btn btn-primary">Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Modal açıldığında ilk inputa odakla (kalite dokunuşu)
+  document.addEventListener('shown.bs.modal', function (e) {
+    const first = e.target.querySelector('input,select,textarea');
+    if (first) { first.focus(); }
+  });
+</script>
