@@ -350,50 +350,41 @@ def create_app():
 
    from sqlalchemy.orm import joinedload
 
+# --- YÖNETİM PANELİ (CRUD) ---
 @app.route('/admin')
 @login_required
 def admin_panel():
+    # URL parametreleri: ?page=2&per=25 gibi
+    page = request.args.get('page', default=1, type=int)
+    per = request.args.get('per', default=25, type=int)
+
     try:
+        # Sol üst listeler (tam liste)
         hammaddeler = Hammadde.query.order_by(Hammadde.isim).all()
         urunler = Urun.query.order_by(Urun.isim).all()
 
-        page = int(request.args.get('page', 1))
-        per_page = min(max(int(request.args.get('per', 100)), 20), 500)
+        # Reçeteler için sayfalama
+        recete_query = (Recete.query
+                        .join(Urun, Urun.id == Recete.urun_id)
+                        .join(Hammadde, Hammadde.id == Recete.hammadde_id)
+                        .order_by(Urun.isim, Hammadde.isim))
 
-        receteler_query = Recete.query.options(
-            joinedload(Recete.urun),
-            joinedload(Recete.hammadde)
-        ).order_by(Recete.urun_id.asc(), Recete.hammadde_id.asc())
+        recete_pagination = recete_query.paginate(page=page, per_page=per, error_out=False)
+        receteler = recete_pagination.items
 
-        receteler_paginated = receteler_query.paginate(page=page, per_page=per_page, error_out=False)
-
-        return render_template(
-            'admin.html',
-            title='Menü Yönetimi',
-            hammaddeler=hammaddeler,
-            urunler=urunler,
-            receteler=receteler_paginated.items,
-            recete_pagination={
-                "page": receteler_paginated.page,
-                "pages": receteler_paginated.pages,
-                "per_page": receteler_paginated.per_page,
-                "total": receteler_paginated.total,
-                "has_next": receteler_paginated.has_next,
-                "has_prev": receteler_paginated.has_prev,
-                "next_num": receteler_paginated.next_num,
-                "prev_num": receteler_paginated.prev_num,
-            }
-        )
     except Exception as e:
         flash(f'Veritabanı hatası: {e}', 'danger')
-        return render_template(
-            'admin.html',
-            title='Menü Yönetimi',
-            hammaddeler=[],
-            urunler=[],
-            receteler=[],
-            recete_pagination=None
-        )
+        hammaddeler, urunler, receteler = [], [], []
+        recete_pagination = None
+
+    return render_template(
+        'admin.html',
+        title='Menü Yönetimi',
+        hammaddeler=hammaddeler,
+        urunler=urunler,
+        receteler=receteler,
+        recete_pagination=recete_pagination
+    )
 
 
     # --- Hammadde CRUD ---
