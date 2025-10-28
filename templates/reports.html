@@ -1,194 +1,175 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-10 col-xl-8">
-    <div class="text-center">
-      <h1>Analiz Motorları</h1>
-      <p class="lead text-muted mb-5">
-        Fiyat stratejilerinizi belirlemek ve kârlılığınızı optimize etmek için bu araçları kullanın.
-      </p>
-    </div>
+<h1>Analiz Motorları</h1>
+<p class="text-muted mb-4">Fiyat kararlarını sade araçlarla modelleyin.</p>
 
-    <!-- Motor 1: Hedef Marj Hesaplayıcı -->
-    <div class="card shadow-sm mb-4">
-      <div class="card-body p-4 p-lg-5">
-        <h3 class="mb-3"><i class="bi bi-bullseye text-primary"></i> Hedef Marj Hesaplayıcı</h3>
-        <p class="text-muted">Bir ürünün maliyetine göre istediğiniz kar marjı için gereken satış fiyatını hesaplar.</p>
-        <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
+<div class="row g-3">
+
+  <!-- Hedef marj -->
+  <div class="col-12">
+    <div class="rp-card rp-shadow">
+      <div class="rp-card-body">
+        <h2>Hedef Marj Hesaplayıcı</h2>
+        <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
           <input type="hidden" name="analiz_tipi" value="hedef_marj">
-          <div class="row g-3 align-items-end">
-            <div class="col-sm-6">
-              <label for="hedef_urun" class="form-label">Ürün</label>
-              <select class="form-select" name="urun_ismi" id="hedef_urun" required>
-                <option value="" disabled selected>Bir ürün seçin...</option>
-                {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-sm-3">
-              <label for="hedef_marj" class="form-label">Hedef Marj (%)</label>
-              <input type="number" class="form-control" name="hedef_marj" id="hedef_marj" value="70" step="1" min="1" max="99" required>
-            </div>
-            <div class="col-sm-3">
-              <button type="submit" class="btn btn-dark w-100">Hesapla</button>
-            </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">Ürün</label>
+            <select class="form-select" name="urun_ismi" required>
+              <option value="" disabled selected>Seçin…</option>
+              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">Hedef Marj (%)</label>
+            <input class="form-control" type="number" name="hedef_marj" value="70" min="1" max="99" step="1" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <button class="btn btn-dark w-100">Hesapla</button>
           </div>
         </form>
       </div>
     </div>
+  </div>
 
-    <!-- Motor 2: Fiyat Simülatörü -->
-    <section class="card shadow-sm mb-4">
-      <div class="card-body p-4 p-lg-5">
-        <h3 class="mb-3"><i class="bi bi-graph-up-arrow"></i> Fiyat Simülatörü</h3>
-        <p class="text-muted">“Ya fiyatı değiştirirsem?” sorusuna tahmini kâr etkisini gösterir.</p>
-        <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
+  <!-- Simülatör -->
+  <div class="col-12">
+    <div class="rp-card rp-shadow">
+      <div class="rp-card-body">
+        <h2>Fiyat Simülatörü</h2>
+        <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
           <input type="hidden" name="analiz_tipi" value="simulasyon">
-          <div class="row g-3 align-items-end">
-            <div class="col-sm-6">
-              <label for="sim_urun" class="form-label">Ürün</label>
-              <select class="form-select" name="urun_ismi" id="sim_urun" required>
-                <option value="" disabled selected>Bir ürün seçin...</option>
-                {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-sm-3">
-              <label for="yeni_fiyat" class="form-label">Yeni Fiyat (TL)</label>
-              <input type="number" class="form-control" name="yeni_fiyat" id="yeni_fiyat" placeholder="Örn: 150" step="0.5" min="1" required>
-            </div>
-            <div class="col-sm-3">
-              <button type="submit" class="btn btn-dark w-100">Simüle Et</button>
-            </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">Ürün</label>
+            <select class="form-select" name="urun_ismi" required>
+              <option value="" disabled selected>Seçin…</option>
+              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label">Yeni Fiyat (TL)</label>
+            <input class="form-control" type="number" name="yeni_fiyat" step="0.5" min="1" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <button class="btn btn-dark w-100">Simüle Et</button>
           </div>
         </form>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <!-- Motor 3: Optimum Fiyat -->
-    <section class="card shadow-sm mb-4">
-      <div class="card-body p-4 p-lg-5">
-        <h3 class="mb-3"><i class="bi bi-gem"></i> Optimum Fiyat</h3>
-        <p class="text-muted">Geçmiş veriye göre maksimum kâr getirecek fiyatı tahmin eder.</p>
-        <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
+  <!-- Optimum fiyat -->
+  <div class="col-12">
+    <div class="rp-card rp-shadow">
+      <div class="rp-card-body">
+        <h2>Optimum Fiyat Motoru</h2>
+        <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
           <input type="hidden" name="analiz_tipi" value="optimum_fiyat">
-          <div class="row g-3 align-items-end">
-            <div class="col-sm-9">
-              <label for="opt_urun" class="form-label">Ürün</label>
-              <select class="form-select" name="urun_ismi" id="opt_urun" required>
-                <option value="" disabled selected>Bir ürün seçin...</option>
-                {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-sm-3">
-              <button type="submit" class="btn btn-dark w-100">Hesapla</button>
-            </div>
+          <div class="col-12 col-md-9">
+            <label class="form-label">Ürün</label>
+            <select class="form-select" name="urun_ismi" required>
+              <option value="" disabled selected>Seçin…</option>
+              {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <button class="btn btn-dark w-100">Hesapla</button>
           </div>
         </form>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <!-- Motor 4/5: Stratejik Analiz (Kategori / Grup) -->
-    <section class="card shadow-sm mb-5">
-      <div class="card-body p-4 p-lg-5">
-        <h3><i class="bi bi-diagram-3"></i> Stratejik Analiz</h3>
-        <p class="text-muted">Kategori veya grup bazında kâr dağılımını ve değişimi inceler.</p>
+  <!-- Stratejik analiz -->
+  <div class="col-12">
+    <div class="rp-card rp-shadow">
+      <div class="rp-card-body">
+        <h2>Stratejik Analiz</h2>
+        <div class="row g-3">
+          <form action="{{ url_for('reports') }}" method="POST" class="col-12 col-lg-6">
+            <input type="hidden" name="analiz_tipi" value="kategori">
+            <label class="form-label">Kategori</label>
+            <div class="row g-2">
+              <div class="col-12">
+                <select class="form-select" name="kategori_ismi" required>
+                  <option value="" disabled selected>Seçin…</option>
+                  {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label">Gün</label>
+                <input class="form-control" type="number" name="gun_sayisi" value="7" min="1" step="1" required>
+              </div>
+              <div class="col-12 col-md-8">
+                <button class="btn btn-dark w-100">Kategori Analizi</button>
+              </div>
+            </div>
+          </form>
 
-        <!-- Kategori -->
-        <form action="{{ url_for('reports') }}" method="POST" class="mt-4">
-          <input type="hidden" name="analiz_tipi" value="kategori">
-          <div class="row g-3 align-items-end">
-            <div class="col-sm-6">
-              <label for="kategori_isim" class="form-label">Kategori</label>
-              <select class="form-select" name="kategori_ismi" id="kategori_isim" required>
-                <option value="" disabled selected>Bir kategori seçin...</option>
-                {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
-              </select>
+          <form action="{{ url_for('reports') }}" method="POST" class="col-12 col-lg-6">
+            <input type="hidden" name="analiz_tipi" value="grup">
+            <label class="form-label">Grup</label>
+            <div class="row g-2">
+              <div class="col-12">
+                <select class="form-select" name="grup_ismi" required>
+                  <option value="" disabled selected>Seçin…</option>
+                  {% for grup in grup_listesi %}<option value="{{ grup }}">{{ grup }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label">Gün</label>
+                <input class="form-control" type="number" name="gun_sayisi" value="7" min="1" step="1" required>
+              </div>
+              <div class="col-12 col-md-8">
+                <button class="btn btn-dark w-100">Grup Analizi</button>
+              </div>
             </div>
-            <div class="col-sm-3">
-              <label for="gun_kat" class="form-label">Periyot (Gün)</label>
-              <input type="number" class="form-control" name="gun_sayisi" id="gun_kat" value="7" step="1" min="1" required>
-            </div>
-            <div class="col-sm-3">
-              <button type="submit" class="btn btn-dark w-100">Kategori Analizi</button>
-            </div>
-          </div>
-        </form>
-
-        <!-- Grup -->
-        <form action="{{ url_for('reports') }}" method="POST" class="mt-3 pt-3 border-top">
-          <input type="hidden" name="analiz_tipi" value="grup">
-          <div class="row g-3 align-items-end">
-            <div class="col-sm-6">
-              <label for="grup_isim" class="form-label">Grup</label>
-              <select class="form-select" name="grup_ismi" id="grup_isim" required>
-                <option value="" disabled selected>Bir grup seçin...</option>
-                {% for g in grup_listesi %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-sm-3">
-              <label for="gun_grup" class="form-label">Periyot (Gün)</label>
-              <input type="number" class="form-control" name="gun_sayisi" id="gun_grup" value="7" step="1" min="1" required>
-            </div>
-            <div class="col-sm-3">
-              <button type="submit" class="btn btn-dark w-100">Grup Analizi</button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <!-- Analiz Sonucu -->
-    {% if analiz_sonucu %}
-    <div class="mb-5">
-      <h2 class="mb-4">Analiz Sonucu: {{ analiz_tipi_baslik }}</h2>
-      <div class="card shadow-sm">
-        <div class="card-body p-4">
-          {% if chart_data %}
-          <div class="mb-4">
-            <canvas id="myChart" height="120"></canvas>
-          </div>
-          <hr class="my-3">
-          {% endif %}
-          <pre class="mb-0" style="background-color:#fff;border:none;padding:0;">{{ analiz_sonucu }}</pre>
+          </form>
         </div>
       </div>
     </div>
-    {% endif %}
   </div>
+
+  {% if analiz_sonucu %}
+  <div class="col-12">
+    <div class="rp-card rp-shadow">
+      <div class="rp-card-body">
+        <h2 class="mb-3">{{ analiz_tipi_baslik }}</h2>
+        {% if chart_data %}
+        <canvas id="reportChart" height="120"></canvas>
+        <hr class="my-4">
+        {% endif %}
+        <pre class="mb-0" style="background:#fff; border:none; padding:0;">{{ analiz_sonucu }}</pre>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
+{% if chart_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
-(function() {
-  const canvas = document.getElementById('myChart');
-  if (!canvas) return;
-  try {
-    const raw = {{ (chart_data or 'null') | tojson | safe }};
-    if (!raw) return; // grafik yok
-
-    // raw zaten Chart.js şeması: { labels: [...], datasets: [...] }
-    const type = (raw.datasets && raw.datasets.length > 1) ? 'bar' : 'line';
-
-    new Chart(canvas.getContext('2d'), {
-      type,
-      data: raw,
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: 'top' },
-          title: { display: true, text: '{{ analiz_tipi_baslik|default("Analiz Grafiği") }}' }
-        },
-        scales: (type === 'line') ? {
-          x: { title: { display: true, text: 'Fiyat / Grup' } },
-          y: { title: { display: true, text: 'Tahmini Toplam Kâr (TL)' } }
+(function(){
+  try{
+    const data = JSON.parse({{ (chart_data or 'null')|tojson|safe }});
+    const el = document.getElementById('reportChart'); if(!el||!data) return;
+    const type = (data.datasets && data.datasets.length>1) ? 'bar':'line';
+    new Chart(el.getContext('2d'), {
+      type, data,
+      options:{
+        responsive:true,
+        plugins:{ legend:{position:'top'}, title:{display:false}},
+        scales: type==='line' ? {
+          x:{ title:{display:true, text:'Satış Fiyatı (TL)'} },
+          y:{ title:{display:true, text:'Tahmini Toplam Kâr (TL)'} }
         } : {}
       }
     });
-  } catch (e) {
-    console.error('Grafik verisi çizilemedi:', e);
-  }
+  }catch(e){ console.error(e); }
 })();
 </script>
+{% endif %}
 {% endblock %}
