@@ -270,7 +270,12 @@ def create_app():
             flash(f'Veritabanı bağlantı hatası: {e}', 'danger')
 
         return render_template('dashboard.html', title='Ana Ekran', summary=summary)
-
+        # Menü Yönetimi alias (base.html url_for('menu_yonetimi') kırılmasın diye)
+    @app.route('/menu-yonetimi')
+    @login_required
+    def menu_yonetimi():
+        return redirect(url_for('admin_panel'))
+    
     # Excel yükleme
     @app.route('/upload-excel', methods=['POST'])
     @login_required
