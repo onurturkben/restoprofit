@@ -1,24 +1,22 @@
 # app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
 
 import os
+import re
 from datetime import datetime, timedelta
-import pandas as pd
 
+import pandas as pd
 from flask import (
     Flask, render_template, render_template_string, request,
     redirect, url_for, flash, send_from_directory
 )
-
 from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
 
 # --- database.py içe aktarımları ---
-# Bazı projelerde init_db tanımlı değilse fallback yapıyoruz.
 try:
     from database import (
         db, init_db, Hammadde, Urun, Recete, SatisKaydi, User,
@@ -31,7 +29,7 @@ except ImportError:
     )
 
     def init_db(app):
-        """Fallback: database.init_app + DATABASE_URL var ise bağlanır."""
+        """Fallback: db.init_app"""
         db.init_app(app)
 
 
@@ -42,7 +40,6 @@ from analysis_engine import (
     bul_optimum_fiyat,
     analiz_et_kategori_veya_grup
 )
-import re
 
 EMOJI_RX = re.compile(r'[\U0001F300-\U0001FAFF\U00002700-\U000027BF]+', flags=re.UNICODE)
 
@@ -51,9 +48,7 @@ def strip_emojis(text: str) -> str:
         return text
     return EMOJI_RX.sub('', text).strip()
 
-# -----------------------------------------------------------------------------
-# Yardımcılar
-# -----------------------------------------------------------------------------
+
 def parse_decimal(value: str, default=None):
     """Virgüllü/noktalı ondalıkları güvenle float'a çevirir."""
     if value is None:
@@ -63,21 +58,19 @@ def parse_decimal(value: str, default=None):
     except (ValueError, TypeError):
         return default
 
+
 def safe_int(value, default=None):
     try:
         return int(value)
     except (ValueError, TypeError):
         return default
 
-# -----------------------------------------------------------------------------
-# Uygulama Yapılandırması
-# -----------------------------------------------------------------------------
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'DEGISTIRIN:dev-secret-key')
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB upload limiti
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'static/uploads')
 
-    # Prod güvenlik/oturum (CDN kullandığımız için CSP gevşek)
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
@@ -86,7 +79,6 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
     SEND_FILE_MAX_AGE_DEFAULT = 86400  # 1 gün
 
-    # SQLAlchemy: Render kopmalarına karşı güvenli havuz
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": 300,
@@ -97,13 +89,10 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Upload klasörü
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-    # DB init (DATABASE_URL varsa Postgres, yoksa sqlite fallback)
     init_db(app)
 
-    # Auth
     bcrypt = Bcrypt(app)
     login_manager = LoginManager(app)
     login_manager.login_view = 'login'
@@ -114,7 +103,6 @@ def create_app():
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
-    # İlk admin (ENV ile override edilebilir)
     with app.app_context():
         db.create_all()
         if not User.query.first():
@@ -129,18 +117,15 @@ def create_app():
                 db.session.rollback()
                 print(f"[INIT] Admin oluşturulamadı: {e}")
 
-    # Global template değişkenleri
     @app.context_processor
     def inject_globals():
         return dict(current_user=current_user, site_name="RestoProfit")
 
-    # Güvenlik başlıkları
     @app.after_request
     def set_security_headers(resp):
         resp.headers['X-Content-Type-Options'] = 'nosniff'
         resp.headers['X-Frame-Options'] = 'SAMEORIGIN'
         resp.headers['Referrer-Policy'] = 'no-referrer-when-downgrade'
-        # CDN’lerle uyumlu, temel CSP
         resp.headers['Content-Security-Policy'] = (
             "default-src 'self' https: data: blob:; "
             "img-src 'self' https: data:; "
@@ -150,9 +135,6 @@ def create_app():
         )
         return resp
 
-    # -----------------------------------------------------------------------------
-    # Hata Sayfaları
-    # -----------------------------------------------------------------------------
     @app.errorhandler(413)
     def too_large(_e):
         flash("Yüklenen dosya çok büyük (16 MB sınır).", "danger")
@@ -160,19 +142,16 @@ def create_app():
 
     @app.errorhandler(404)
     def not_found(_e):
-        # Ayrı bir errors/404.html yoksa base.html ile boş sayfa render
         try:
             return render_template('errors/404.html', title='Bulunamadı'), 404
         except Exception:
             return render_template('base.html', title='Bulunamadı'), 404
 
     @app.errorhandler(500)
-    def server_error(e):
-        # burada log da atılabilir: app.logger.exception(e)
+    def server_error(_e):
         try:
             return render_template('errors/500.html', title='Sunucu Hatası'), 500
         except Exception:
-            # Temel, geri-dönüş render
             html = """
             {% extends 'base.html' %}
             {% block content %}
@@ -185,12 +164,8 @@ def create_app():
             """
             return render_template_string(html), 500
 
-    # -----------------------------------------------------------------------------
-    # Yardımcı Servis Uçları
-    # -----------------------------------------------------------------------------
     @app.route('/healthz')
     def healthz():
-        # DB ping (SQLAlchemy 2.x uyumlu)
         try:
             db.session.execute(text("SELECT 1"))
         except Exception:
@@ -210,15 +185,16 @@ def create_app():
     def favicon():
         static_fav = os.path.join(app.root_path, 'static', 'favicon.ico')
         if os.path.exists(static_fav):
-            return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico',
-                                       mimetype='image/vnd.microsoft.icon')
+            return send_from_directory(
+                os.path.join(app.root_path, 'static'),
+                'favicon.ico',
+                mimetype='image/vnd.microsoft.icon'
+            )
         return ('', 204)
 
-    # -----------------------------------------------------------------------------
-    # ROUTES
-    # -----------------------------------------------------------------------------
-
-    # Giriş
+    # -------------------------
+    # AUTH
+    # -------------------------
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         if current_user.is_authenticated:
@@ -235,7 +211,6 @@ def create_app():
 
         return render_template('login.html', title='Giriş Yap')
 
-    # Çıkış
     @app.route('/logout')
     @login_required
     def logout():
@@ -243,7 +218,6 @@ def create_app():
         flash('Başarıyla çıkış yaptınız.', 'info')
         return redirect(url_for('login'))
 
-    # Şifre Değiştir (tek sürüm)
     @app.route('/change-password', methods=['GET', 'POST'])
     @login_required
     def change_password():
@@ -277,8 +251,14 @@ def create_app():
 
         return render_template('change_password.html', title='Şifre Değiştir')
 
-    # Ana ekran
-    @app.route('/')
+    # -------------------------
+    # DASHBOARD
+    # ÖNEMLİ: base.html'de url_for('index') varsa kırılmasın diye:
+    # '/' route'un endpoint'i 'index' olarak da tanımlandı.
+    # Aynı fonksiyon ayrıca '/dashboard' endpoint='dashboard' ile de erişilebilir.
+    # -------------------------
+    @app.route('/', endpoint='index')
+    @app.route('/dashboard', endpoint='dashboard')
     @login_required
     def dashboard():
         try:
@@ -311,7 +291,6 @@ def create_app():
             if missing:
                 raise ValueError(f"Excel'de eksik kolon(lar): {', '.join(missing)}")
 
-            # Ürün id & maliyet haritaları
             urunler_db = Urun.query.all()
             urun_eslestirme = {u.excel_adi: u.id for u in urunler_db}
             urun_maliyet = {u.id: (u.hesaplanan_maliyet or 0.0) for u in urunler_db}
@@ -328,7 +307,7 @@ def create_app():
                     tarih = pd.to_datetime(row['Tarih'], errors='coerce')
 
                     if excel_adi == '' or adet is None or adet <= 0 or toplam_tutar is None or toplam_tutar < 0 or pd.isna(tarih):
-                        hatali_satirlar.append(idx + 2)  # başlık satırı offset
+                        hatali_satirlar.append(idx + 2)
                         continue
 
                     urun_id = urun_eslestirme.get(excel_adi)
@@ -374,16 +353,16 @@ def create_app():
 
         return redirect(url_for('dashboard'))
 
-    # --- YÖNETİM PANELİ (CRUD) ---
+    # -------------------------
+    # ADMIN PANEL
+    # -------------------------
     @app.route('/admin')
     @login_required
     def admin_panel():
-        # URL parametreleri: ?page=2&per=25 gibi
         page = request.args.get('page', default=1, type=int)
         per = request.args.get('per', default=25, type=int)
 
         try:
-            # Flask-SQLAlchemy 3.x uyumlu SELECT + scalars()
             hammaddeler = db.session.scalars(
                 db.select(Hammadde).order_by(Hammadde.isim)
             ).all()
@@ -392,19 +371,14 @@ def create_app():
                 db.select(Urun).order_by(Urun.isim)
             ).all()
 
-            # Reçeteler için joinedload + SELECT
             recete_stmt = (
                 db.select(Recete)
-                  .options(
-                      joinedload(Recete.urun),
-                      joinedload(Recete.hammadde),
-                  )
+                  .options(joinedload(Recete.urun), joinedload(Recete.hammadde))
                   .join(Urun, Urun.id == Recete.urun_id)
                   .join(Hammadde, Hammadde.id == Recete.hammadde_id)
                   .order_by(Urun.isim, Hammadde.isim)
             )
 
-            # Flask-SQLAlchemy 3.x’te paginate bu şekilde
             recete_pagination = db.paginate(
                 recete_stmt,
                 page=page,
@@ -424,7 +398,6 @@ def create_app():
 
         except Exception as e:
             db.session.rollback()
-            # Hata durumunda boş listelerle sayfayı aç, mesaj göster
             flash(f"Menü Yönetimi yüklenirken hata: {e}", "danger")
             return render_template(
                 'admin.html',
@@ -435,7 +408,6 @@ def create_app():
                 recete_pagination=None
             )
 
-    # --- Hammadde CRUD ---
     @app.route('/add-material', methods=['POST'])
     @login_required
     def add_material():
@@ -456,7 +428,6 @@ def create_app():
             flash(f"'{isim}' eklendi.", 'success')
         except Exception as e:
             db.session.rollback()
-            # IntegrityError dahil tüm hatalar
             if 'UNIQUE' in str(e).upper():
                 flash(f"'{isim}' zaten mevcut.", 'danger')
             else:
@@ -483,7 +454,6 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            # isim çakışması kontrolü
             exists = db.session.scalar(
                 db.select(Hammadde).where(Hammadde.isim == isim, Hammadde.id != id)
             )
@@ -511,7 +481,6 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            # ilişkili reçete var mı?
             linked = db.session.scalar(
                 db.select(Recete).where(Recete.hammadde_id == id).limit(1)
             )
@@ -527,7 +496,6 @@ def create_app():
             flash(f"Silme hatası: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
-    # --- Ürün CRUD ---
     @app.route('/add-product', methods=['POST'])
     @login_required
     def add_product():
@@ -582,7 +550,6 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            # isim ve excel_adi çakışmaları
             exists_name = db.session.scalar(
                 db.select(Urun).where(Urun.isim == isim, Urun.id != id)
             )
@@ -621,13 +588,12 @@ def create_app():
         try:
             db.session.delete(urun)
             db.session.commit()
-            flash(f"'{urun.isim}' ve ilgili kayıtlar silindi.", 'success')
+            flash(f"'{urun.isim}' silindi.", 'success')
         except Exception as e:
             db.session.rollback()
             flash(f"Silme hatası: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
-    # --- Reçete CRUD ---
     @app.route('/add-recipe', methods=['POST'])
     @login_required
     def add_recipe():
@@ -703,7 +669,6 @@ def create_app():
             flash(f"Silme hatası: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
-    # --- Veriyi Yönet ---
     @app.route('/delete-sales-by-date', methods=['POST'])
     @login_required
     def delete_sales_by_date():
@@ -713,9 +678,11 @@ def create_app():
             return redirect(url_for('admin_panel'))
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            num_deleted = (db.session.query(SatisKaydi)
-                           .filter(func.date(SatisKaydi.tarih) == target_date)
-                           .delete(synchronize_session=False))
+            num_deleted = (
+                db.session.query(SatisKaydi)
+                .filter(func.date(SatisKaydi.tarih) == target_date)
+                .delete(synchronize_session=False)
+            )
             db.session.commit()
             if num_deleted > 0:
                 flash(f"{target_date.strftime('%d %B %Y')} tarihindeki {num_deleted} satış kaydı silindi.", 'success')
@@ -728,12 +695,12 @@ def create_app():
             flash(f"Silme hatası: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
-
-    # --- RAPORLAR / ANALİZ MOTORLARI ---
+    # -------------------------
+    # REPORTS / ANALYSIS
+    # -------------------------
     @app.route('/reports', methods=['GET', 'POST'])
     @login_required
     def reports():
-        # Seçim listeleri (ürün / kategori / grup)
         try:
             urunler_db = Urun.query.order_by(Urun.isim).all()
             urun_listesi = [u.isim for u in urunler_db]
@@ -758,13 +725,11 @@ def create_app():
             flash(f'Veritabanından listeler çekilirken hata: {e}', 'danger')
             urun_listesi, kategori_listesi, grup_listesi = [], [], []
 
-        # Çıktı & durum değişkenleri
         analiz_sonucu = None
         chart_data = None
         analiz_tipi_baslik = ""
-        analiz_tipi = None  # güvenli varsayılan
+        analiz_tipi = None
 
-        # POST ise analiz yap
         if request.method == 'POST':
             try:
                 analiz_tipi = request.form.get('analiz_tipi')
@@ -831,7 +796,6 @@ def create_app():
                 analiz_sonucu = None
                 chart_data = None
 
-        # SAYFA DÖNÜŞÜ
         return render_template(
             'reports.html',
             title='Analiz Motorları',
@@ -845,15 +809,11 @@ def create_app():
             aktif_analiz_tipi=analiz_tipi if request.method == 'POST' else None
         )
 
-
-    # Flask run (lokal) / Render (gunicorn) uyumlu dönüş
     return app
 
 
-# --- Ana uygulama çalıştırma ---
 app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    # Prod’da gunicorn kullanın; bu sadece lokal geliştirme içindir
     app.run(host='0.0.0.0', port=port, debug=bool(os.environ.get('FLASK_DEBUG')))
