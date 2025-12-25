@@ -1,0 +1,62 @@
+body {
+  font-family: "Poppins", system-ui, sans-serif;
+  color: #1f2328;
+}
+
+/* BRAND */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.brand-text {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: #1f2328;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #1f2328;
+  position: relative;
+}
+
+/* Grafik / büyüme hissi */
+.brand-mark::before,
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  background: #ffffff;
+  border-radius: 999px;
+}
+
+.brand-mark::before {
+  width: 16px;
+  height: 3px;
+  left: 9px;
+  top: 20px;
+  transform: rotate(-35deg);
+}
+
+.brand-mark::after {
+  width: 10px;
+  height: 3px;
+  left: 16px;
+  top: 13px;
+  transform: rotate(-35deg);
+}
+
+/* Navbar linkleri */
+.nav-link {
+  font-weight: 500;
+  color: #1f2328;
+}
+
+.nav-link.active {
+  font-weight: 700;
+}
