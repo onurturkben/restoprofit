@@ -1,5 +1,33 @@
 {% extends 'base.html' %}
 
+{% macro render_report(text) %}
+  <div class="rp-report">
+    {% for line in text.split('\n') %}
+      {% set t = line.strip() %}
+
+      {% if not t %}
+        <div class="rp-report-gap"></div>
+
+      {% elif t.startswith('---') %}
+        <div class="rp-report-section">{{ t.replace('-', '').strip() }}</div>
+
+      {% elif t.startswith('=') %}
+        <div class="rp-report-divider"></div>
+
+      {% elif ':' in t %}
+        {% set parts = t.split(':', 1) %}
+        <div class="rp-report-row">
+          <div class="rp-report-k">{{ parts[0].strip() }}</div>
+          <div class="rp-report-v">{{ parts[1].strip() }}</div>
+        </div>
+
+      {% else %}
+        <div class="rp-report-text">{{ t }}</div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
 {% block content %}
   <header class="mb-4">
     <h1 class="fw-bold" style="font-size:32px; line-height:40px;">Analiz Motorları</h1>
@@ -33,7 +61,7 @@
       {% if aktif_analiz_tipi == 'hedef_marj' and analiz_sonucu %}
         <hr class="my-4">
         <h3 class="h6 text-muted mb-2">Sonuç özeti</h3>
-        <pre class="p-3 bg-light rounded-3 mb-0" style="white-space:pre-wrap; border:1px solid #e9ecef;">{{ analiz_sonucu }}</pre>
+        {{ render_report(analiz_sonucu) }}
       {% endif %}
     </div>
 
@@ -61,7 +89,7 @@
       {% if aktif_analiz_tipi == 'simulasyon' and analiz_sonucu %}
         <hr class="my-4">
         <h3 class="h6 text-muted mb-2">Sonuç özeti</h3>
-        <pre class="p-3 bg-light rounded-3 mb-0" style="white-space:pre-wrap; border:1px solid #e9ecef;">{{ analiz_sonucu }}</pre>
+        {{ render_report(analiz_sonucu) }}
       {% endif %}
     </div>
 
@@ -88,7 +116,7 @@
         {% if chart_data %}
           <canvas id="optChart" class="mb-3" height="120"></canvas>
         {% endif %}
-        <pre class="p-3 bg-light rounded-3 mb-0" style="white-space:pre-wrap; border:1px solid #e9ecef;">{{ analiz_sonucu }}</pre>
+        {{ render_report(analiz_sonucu) }}
       {% endif %}
     </div>
 
@@ -138,7 +166,7 @@
         <hr class="my-4">
         <h3 class="h6 text-muted mb-2">Sonuç özeti</h3>
         {% if chart_data %}<canvas id="catChart" class="mb-3" height="120"></canvas>{% endif %}
-        <pre class="p-3 bg-light rounded-3 mb-0" style="white-space:pre-wrap; border:1px solid #e9ecef;">{{ analiz_sonucu }}</pre>
+        {{ render_report(analiz_sonucu) }}
       {% endif %}
     </div>
 
@@ -165,6 +193,7 @@
   })();
 </script>
 {% endif %}
+
 {% if aktif_analiz_tipi in ['kategori','grup'] and chart_data %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
