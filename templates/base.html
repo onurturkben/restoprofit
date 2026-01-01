@@ -8,6 +8,10 @@
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
+  <!-- ✅ Proje CSS (senin static/main/main.css) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='main/main.css') }}">
+
+  <!-- ✅ Sayfaya özel küçük dokunuşlar (opsiyonel) -->
   <style>
     :root{
       --text:#111827;
@@ -42,13 +46,12 @@
     }
 
     .brand-logo{
-      height:40px;          /* 🔥 büyüklük */
+      height:40px;
       width:auto;
       display:block;
       object-fit:contain;
     }
 
-    /* İstersen hover’da hafif vurgu */
     .brand:hover{ opacity:.95; }
 
     /* Nav links */
@@ -59,6 +62,7 @@
       padding:.5rem .75rem;
       transition:all .15s ease;
       text-decoration:none;
+      font-weight:600;
     }
     .navbar .nav-link:hover{
       opacity:1;
@@ -68,6 +72,17 @@
       opacity:1;
       background:rgba(37,99,235,.12);
       color:var(--accent);
+    }
+
+    /* ✅ Navbar toggler ikonunun görünmesi için (Bootstrap 5 şartı) */
+    .navbar-toggler{
+      border: 1px solid rgba(17,24,39,.15);
+      border-radius: 12px;
+      padding: .35rem .55rem;
+    }
+    .navbar-toggler-icon{
+      width: 1.2em;
+      height: 1.2em;
     }
   </style>
 </head>
@@ -92,14 +107,20 @@
 
     <div class="collapse navbar-collapse" id="topNav">
       <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('dashboard') }}">Ana Ekran</a>
+          <a class="nav-link {% if request.endpoint in ['dashboard','index'] %}active{% endif %}"
+             href="{{ url_for('dashboard') }}">Ana Ekran</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports') }}">Analiz Motorları</a>
+          <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}"
+             href="{{ url_for('reports') }}">Analiz Motorları</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('admin_panel') }}">Menü Yönetimi</a>
+          <a class="nav-link {% if request.endpoint == 'admin_panel' %}active{% endif %}"
+             href="{{ url_for('admin_panel') }}">Menü Yönetimi</a>
         </li>
 
         {% if current_user.is_authenticated %}
@@ -114,6 +135,7 @@
             <a class="nav-link" href="{{ url_for('login') }}">Giriş</a>
           </li>
         {% endif %}
+
       </ul>
     </div>
   </div>
@@ -133,6 +155,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+<!-- ✅ Admin.html gibi sayfalardan gelen JS’ler buraya basılır -->
 {% block scripts %}{% endblock %}
+
 </body>
 </html>
