@@ -10,6 +10,25 @@
 
   <!-- ✅ Proje CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='main/main.css') }}">
+
+  <!-- ✅ Logo boyutu + navbar yüksekliği kontrolü (çok büyümeyi engeller) -->
+  <style>
+    .navbar { padding-top: 6px; padding-bottom: 6px; }
+    .navbar-brand { padding-top: 0; padding-bottom: 0; margin-right: 14px; }
+
+    /* LOGO: normal ve dengeli */
+    .rp-logo{
+      height: 34px;          /* 32-36 arası ideal */
+      width: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    /* Mobilde biraz küçülsün */
+    @media (max-width: 576px){
+      .rp-logo{ height: 30px; }
+    }
+  </style>
 </head>
 
 <body>
