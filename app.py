@@ -1,5 +1,6 @@
 # app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
 # NOT: Bu sürümde /add-recipe endpoint'i "çoklu satır" (r_hammadde_id[] / r_miktar[]) destekler.
+# ✅ EK: Dashboard'da son X güne göre en iyi / en kötü 3 ürün (marj) listesi
 
 import os
 import re
@@ -14,7 +15,7 @@ from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-from sqlalchemy import func, text
+from sqlalchemy import func, text, desc, asc
 from sqlalchemy.orm import joinedload
 
 # --- database.py içe aktarımları ---
@@ -254,12 +255,76 @@ def create_app():
         return render_template('change_password.html', title='Şifre Değiştir')
 
     # -------------------------
+    # DASHBOARD HELPERS
+    # -------------------------
+    def _top_bottom_products_by_margin(days: int = 30, limit: int = 3):
+        """
+        Son X gün satışlarına göre ürün bazında:
+        - toplam ciro, toplam kâr, toplam adet
+        - marj % = (toplam_kâr / toplam_ciro) * 100
+        ve en iyi/en kötü N ürünü döndürür.
+        """
+        days = max(1, min(int(days or 30), 3650))
+        since_dt = datetime.now() - timedelta(days=days)
+
+        ciro_sum = func.coalesce(func.sum(SatisKaydi.toplam_tutar), 0.0).label("ciro")
+        kar_sum = func.coalesce(func.sum(SatisKaydi.hesaplanan_kar), 0.0).label("kar")
+        adet_sum = func.coalesce(func.sum(SatisKaydi.adet), 0).label("adet")
+
+        marj_expr = (
+            (kar_sum / func.nullif(ciro_sum, 0.0)) * 100.0
+        ).label("marj")
+
+        base_q = (
+            db.session.query(
+                Urun.id.label("urun_id"),
+                Urun.isim.label("urun_adi"),
+                ciro_sum,
+                kar_sum,
+                adet_sum,
+                marj_expr
+            )
+            .join(SatisKaydi, SatisKaydi.urun_id == Urun.id)
+            .filter(SatisKaydi.tarih >= since_dt)
+            .group_by(Urun.id, Urun.isim)
+            .having(func.sum(SatisKaydi.toplam_tutar) > 0)
+        )
+
+        best_rows = base_q.order_by(desc(marj_expr), desc(kar_sum)).limit(limit).all()
+        worst_rows = base_q.order_by(asc(marj_expr), asc(kar_sum)).limit(limit).all()
+
+        def _to_dict(row):
+            return {
+                "urun_id": row.urun_id,
+                "urun_adi": row.urun_adi,
+                "ciro": float(row.ciro or 0.0),
+                "kar": float(row.kar or 0.0),
+                "adet": int(row.adet or 0),
+                "marj": float(row.marj or 0.0),
+            }
+
+        return [*_map_safe(best_rows, _to_dict)], [*_map_safe(worst_rows, _to_dict)]
+
+    def _map_safe(rows, fn):
+        for r in rows or []:
+            try:
+                yield fn(r)
+            except Exception:
+                continue
+
+    # -------------------------
     # DASHBOARD
     # -------------------------
     @app.route('/', endpoint='index')
     @app.route('/dashboard', endpoint='dashboard')
     @login_required
     def dashboard():
+        # 🔧 İstersen URL'den gün sayısını değiştirebilirsin: /dashboard?days=7
+        days_window = safe_int(request.args.get("days"), 30)
+        if not days_window:
+            days_window = 30
+        days_window = max(1, min(days_window, 3650))
+
         try:
             toplam_satis_kaydi = db.session.query(SatisKaydi).count()
             toplam_urun = db.session.query(Urun).count()
@@ -268,7 +333,23 @@ def create_app():
             summary = {'toplam_satis_kaydi': 0, 'toplam_urun': 0}
             flash(f'Veritabanı bağlantı hatası: {e}', 'danger')
 
-        return render_template('dashboard.html', title='Ana Ekran', summary=summary)
+        # ✅ En iyi / En kötü 3 ürün
+        best_products, worst_products = [], []
+        try:
+            best_products, worst_products = _top_bottom_products_by_margin(days=days_window, limit=3)
+        except Exception as e:
+            # Dashboard asla kırılmasın
+            best_products, worst_products = [], []
+            flash(f"Dashboard ürün analizi hesaplanamadı: {e}", "warning")
+
+        return render_template(
+            'dashboard.html',
+            title='Ana Ekran',
+            summary=summary,
+            best_products=best_products,
+            worst_products=worst_products,
+            days_window=days_window
+        )
 
     # Menü Yönetimi alias
     @app.route('/menu-yonetimi')
@@ -608,11 +689,9 @@ def create_app():
             flash("Ürün seçimi zorunludur.", 'danger')
             return redirect(url_for('admin_panel'))
 
-        # Yeni modal çoklu alan gönderiyor: r_hammadde_id[] ve r_miktar[]
         hammadde_ids = request.form.getlist('r_hammadde_id[]')
         miktarlar = request.form.getlist('r_miktar[]')
 
-        # Eski modal/sistemle uyumluluk (tekli alan gelirse)
         if not hammadde_ids and request.form.get('r_hammadde_id') is not None:
             hammadde_ids = [request.form.get('r_hammadde_id')]
             miktarlar = [request.form.get('r_miktar')]
@@ -621,12 +700,9 @@ def create_app():
             flash("En az 1 hammadde satırı eklemelisiniz.", 'danger')
             return redirect(url_for('admin_panel'))
 
-        # Satırları normalize et: (hammadde_id -> miktar)
-        # Aynı hammadde birden fazla kez seçildiyse miktarları topluyoruz.
         normalized: dict[int, float] = {}
         skipped = 0
 
-        # Güvenlik: uzunluk farkı varsa kısa olana kadar işle
         n = min(len(hammadde_ids), len(miktarlar)) if miktarlar else len(hammadde_ids)
 
         for i in range(n):
@@ -644,13 +720,11 @@ def create_app():
             return redirect(url_for('admin_panel'))
 
         try:
-            # Ürün var mı?
             urun = db.session.get(Urun, urun_id)
             if not urun:
                 flash("Seçilen ürün bulunamadı.", 'danger')
                 return redirect(url_for('admin_panel'))
 
-            # Hammadde var mı? (gönderilen id'leri doğrula)
             valid_h_ids = set(
                 db.session.scalars(
                     db.select(Hammadde.id).where(Hammadde.id.in_(list(normalized.keys())))
@@ -660,7 +734,6 @@ def create_app():
                 flash("Seçilen hammaddeler bulunamadı.", 'danger')
                 return redirect(url_for('admin_panel'))
 
-            # DB'de olmayan hammadde id'leri gönderildiyse filtrele
             missing_ids = [hid for hid in normalized.keys() if hid not in valid_h_ids]
             for hid in missing_ids:
                 normalized.pop(hid, None)
@@ -673,7 +746,6 @@ def create_app():
             added = 0
             updated = 0
 
-            # Mevcut kalemleri bir kerede çek
             existing_rows = db.session.scalars(
                 db.select(Recete).where(
                     Recete.urun_id == urun_id,
@@ -682,7 +754,6 @@ def create_app():
             ).all()
             existing_map = {r.hammadde_id: r for r in existing_rows}
 
-            # Upsert
             for hid, mikt in normalized.items():
                 if hid in existing_map:
                     existing_map[hid].miktar = float(mikt)
