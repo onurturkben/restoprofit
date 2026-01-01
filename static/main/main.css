@@ -18,6 +18,9 @@
 
   --shadow: 0 12px 30px rgba(17,24,39,.10);
   --shadow-sm: 0 8px 18px rgba(17,24,39,.08);
+
+  /* ✅ Logo yüksekliği (tek yerden kontrol) */
+  --logo-h: 34px;
 }
 
 /* 2) Global */
@@ -34,8 +37,10 @@ body{
   border-bottom:1px solid rgba(229,231,235,.9) !important;
   background: rgba(255,255,255,.92) !important;
   backdrop-filter: saturate(180%) blur(10px);
-  padding-top: 10px;
-  padding-bottom: 10px;
+
+  /* ✅ Daha kompakt navbar */
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 /* ✅ Bootstrap 5 toggler ikonunun görünmesi */
@@ -57,12 +62,17 @@ body{
   text-decoration: none;
 }
 
-/* ✅ KRİTİK: Logo boyutu (Bootstrap ezemesin diye net hedef + !important) */
+/* ✅ Logo boyutu (artık 72px değil) */
 .navbar .navbar-brand .rp-logo{
-  height: 72px !important;   /* Daha büyük istiyorsan 80 yap */
-  width: auto !important;
-  display: block !important;
+  height: var(--logo-h);
+  width: auto;
+  display: block;
   object-fit: contain;
+}
+
+/* Mobilde biraz küçült */
+@media (max-width: 576px){
+  :root{ --logo-h: 30px; }
 }
 
 /* Logo hover */
