@@ -2,18 +2,29 @@
 
 {% macro render_report(text) %}
   <div class="rp-report">
-    {% for line in text.split('\n') %}
-      {% set t = line.strip() %}
+    {% for raw in text.splitlines() %}
+      {% set t = (raw or '').strip() %}
 
       {% if not t %}
         <div class="rp-report-gap"></div>
 
+      {# --- section başlığı --- #}
       {% elif t.startswith('---') %}
         <div class="rp-report-section">{{ t.replace('-', '').strip() }}</div>
 
+      {# --- divider --- #}
       {% elif t.startswith('=') %}
         <div class="rp-report-divider"></div>
 
+      {# --- durum satırları (badge) --- #}
+      {% elif t|upper in ['BAŞARILI','UYARI','HATA','BAŞARISIZ'] %}
+        <div class="rp-report-status rp-{{ t|lower }}">{{ t }}</div>
+
+      {# --- emoji ile başlayan tek satır vurgusu (örn 🏆 Önerilen Fiyat...) --- #}
+      {% elif t.startswith('🏆') or t.startswith('✅') or t.startswith('⚠️') or t.startswith('❌') %}
+        <div class="rp-report-highlight">{{ t }}</div>
+
+      {# --- key:value satırları --- #}
       {% elif ':' in t %}
         {% set parts = t.split(':', 1) %}
         <div class="rp-report-row">
@@ -21,6 +32,7 @@
           <div class="rp-report-v">{{ parts[1].strip() }}</div>
         </div>
 
+      {# --- normal metin --- #}
       {% else %}
         <div class="rp-report-text">{{ t }}</div>
       {% endif %}
@@ -34,7 +46,6 @@
     <p class="text-muted mb-4">Fiyat kararlarını sade araçlarla modelleyin.</p>
   </header>
 
-  <!-- Her motor TEK sütun; aralarda 32px boşluk -->
   <section class="d-flex flex-column gap-4">
 
     <!-- Hedef Marj -->
@@ -42,17 +53,22 @@
       <h2 class="h4 fw-bold mb-3">Hedef Marj Hesaplayıcı</h2>
       <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
         <input type="hidden" name="analiz_tipi" value="hedef_marj">
+
         <div class="col-12 col-md-6">
           <label class="form-label">Ürün</label>
           <select class="form-select" name="urun_ismi" required>
             <option value="" disabled selected>Seçin…</option>
-            {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            {% for urun in urun_listesi %}
+              <option value="{{ urun }}">{{ urun }}</option>
+            {% endfor %}
           </select>
         </div>
+
         <div class="col-6 col-md-3">
           <label class="form-label">Hedef Marj (%)</label>
           <input type="number" class="form-control" name="hedef_marj" value="70" min="1" max="99" step="1" required>
         </div>
+
         <div class="col-6 col-md-3">
           <button class="btn btn-dark w-100">Hesapla</button>
         </div>
@@ -70,17 +86,22 @@
       <h2 class="h4 fw-bold mb-3">Fiyat Simülatörü</h2>
       <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
         <input type="hidden" name="analiz_tipi" value="simulasyon">
+
         <div class="col-12 col-md-6">
           <label class="form-label">Ürün</label>
           <select class="form-select" name="urun_ismi" required>
             <option value="" disabled selected>Seçin…</option>
-            {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            {% for urun in urun_listesi %}
+              <option value="{{ urun }}">{{ urun }}</option>
+            {% endfor %}
           </select>
         </div>
+
         <div class="col-6 col-md-3">
           <label class="form-label">Yeni Fiyat (TL)</label>
           <input type="number" class="form-control" name="yeni_fiyat" placeholder="Örn: 150" min="1" step="0.5" required>
         </div>
+
         <div class="col-6 col-md-3">
           <button class="btn btn-dark w-100">Simüle Et</button>
         </div>
@@ -98,13 +119,17 @@
       <h2 class="h4 fw-bold mb-3">Optimum Fiyat Motoru</h2>
       <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
         <input type="hidden" name="analiz_tipi" value="optimum_fiyat">
+
         <div class="col-12 col-md-9">
           <label class="form-label">Ürün</label>
           <select class="form-select" name="urun_ismi" required>
             <option value="" disabled selected>Seçin…</option>
-            {% for urun in urun_listesi %}<option value="{{ urun }}">{{ urun }}</option>{% endfor %}
+            {% for urun in urun_listesi %}
+              <option value="{{ urun }}">{{ urun }}</option>
+            {% endfor %}
           </select>
         </div>
+
         <div class="col-12 col-md-3">
           <button class="btn btn-dark w-100">Hesapla</button>
         </div>
@@ -113,9 +138,11 @@
       {% if aktif_analiz_tipi == 'optimum_fiyat' and analiz_sonucu %}
         <hr class="my-4">
         <h3 class="h6 text-muted mb-2">Sonuç özeti</h3>
+
         {% if chart_data %}
           <canvas id="optChart" class="mb-3" height="120"></canvas>
         {% endif %}
+
         {{ render_report(analiz_sonucu) }}
       {% endif %}
     </div>
@@ -127,17 +154,22 @@
       <!-- Kategori -->
       <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end mb-3">
         <input type="hidden" name="analiz_tipi" value="kategori">
+
         <div class="col-12 col-md-6">
           <label class="form-label">Kategori</label>
           <select class="form-select" name="kategori_ismi" required>
             <option value="" disabled selected>Seçin…</option>
-            {% for kat in kategori_listesi %}<option value="{{ kat }}">{{ kat }}</option>{% endfor %}
+            {% for kat in kategori_listesi %}
+              <option value="{{ kat }}">{{ kat }}</option>
+            {% endfor %}
           </select>
         </div>
+
         <div class="col-6 col-md-3">
           <label class="form-label">Gün</label>
           <input type="number" class="form-control" name="gun_sayisi" value="7" min="1" step="1" required>
         </div>
+
         <div class="col-6 col-md-3">
           <button class="btn btn-dark w-100">Kategori Analizi</button>
         </div>
@@ -146,17 +178,22 @@
       <!-- Grup -->
       <form action="{{ url_for('reports') }}" method="POST" class="row g-3 align-items-end">
         <input type="hidden" name="analiz_tipi" value="grup">
+
         <div class="col-12 col-md-6">
           <label class="form-label">Grup</label>
           <select class="form-select" name="grup_ismi" required>
             <option value="" disabled selected>Seçin…</option>
-            {% for grup in grup_listesi %}<option value="{{ grup }}">{{ grup }}</option>{% endfor %}
+            {% for grup in grup_listesi %}
+              <option value="{{ grup }}">{{ grup }}</option>
+            {% endfor %}
           </select>
         </div>
+
         <div class="col-6 col-md-3">
           <label class="form-label">Gün</label>
           <input type="number" class="form-control" name="gun_sayisi" value="7" min="1" step="1" required>
         </div>
+
         <div class="col-6 col-md-3">
           <button class="btn btn-dark w-100">Grup Analizi</button>
         </div>
@@ -165,7 +202,11 @@
       {% if aktif_analiz_tipi in ['kategori','grup'] and analiz_sonucu %}
         <hr class="my-4">
         <h3 class="h6 text-muted mb-2">Sonuç özeti</h3>
-        {% if chart_data %}<canvas id="catChart" class="mb-3" height="120"></canvas>{% endif %}
+
+        {% if chart_data %}
+          <canvas id="catChart" class="mb-3" height="120"></canvas>
+        {% endif %}
+
         {{ render_report(analiz_sonucu) }}
       {% endif %}
     </div>
@@ -174,42 +215,46 @@
 {% endblock %}
 
 {% block scripts %}
-{{ super() }}
-{% if aktif_analiz_tipi == 'optimum_fiyat' and chart_data %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  (function(){
-    const el = document.getElementById('optChart');
-    if(!el) return;
-    try{
-      const data = JSON.parse({{ chart_data|tojson|safe }});
-      if(!data || !data.labels) return;
-      new Chart(el.getContext('2d'), {
-        type: 'line',
-        data,
-        options:{ responsive:true, plugins:{legend:{display:true}} }
-      });
-    }catch(e){ console.error(e); }
-  })();
-</script>
-{% endif %}
+  {{ super() }}
 
-{% if aktif_analiz_tipi in ['kategori','grup'] and chart_data %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  (function(){
-    const el = document.getElementById('catChart');
-    if(!el) return;
-    try{
-      const data = JSON.parse({{ chart_data|tojson|safe }});
-      if(!data || !data.labels) return;
-      new Chart(el.getContext('2d'), {
-        type: data.datasets && data.datasets.length>1 ? 'bar' : 'doughnut',
-        data,
-        options:{ responsive:true, plugins:{legend:{position:'top'}} }
-      });
-    }catch(e){ console.error(e); }
-  })();
-</script>
-{% endif %}
+  {# Chart.js sadece gerektiğinde 1 kez yüklensin #}
+  {% if chart_data and aktif_analiz_tipi in ['optimum_fiyat','kategori','grup'] %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  {% endif %}
+
+  {% if aktif_analiz_tipi == 'optimum_fiyat' and chart_data %}
+  <script>
+    (function(){
+      const el = document.getElementById('optChart');
+      if(!el) return;
+      try{
+        const data = JSON.parse({{ chart_data|tojson|safe }});
+        if(!data || !data.labels) return;
+        new Chart(el.getContext('2d'), {
+          type: 'line',
+          data,
+          options:{ responsive:true, plugins:{legend:{display:true}} }
+        });
+      }catch(e){ console.error(e); }
+    })();
+  </script>
+  {% endif %}
+
+  {% if aktif_analiz_tipi in ['kategori','grup'] and chart_data %}
+  <script>
+    (function(){
+      const el = document.getElementById('catChart');
+      if(!el) return;
+      try{
+        const data = JSON.parse({{ chart_data|tojson|safe }});
+        if(!data || !data.labels) return;
+        new Chart(el.getContext('2d'), {
+          type: (data.datasets && data.datasets.length>1) ? 'bar' : 'doughnut',
+          data,
+          options:{ responsive:true, plugins:{legend:{position:'top'}} }
+        });
+      }catch(e){ console.error(e); }
+    })();
+  </script>
+  {% endif %}
 {% endblock %}
