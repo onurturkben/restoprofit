@@ -12,6 +12,8 @@
 
   --accent:#2563eb;     /* mavi */
   --success:#16a34a;    /* yeşil */
+  --warning:#f59e0b;    /* sarı */
+  --danger:#ef4444;     /* kırmızı */
 
   --radius:16px;
   --radius-sm:12px;
@@ -24,6 +26,8 @@
 }
 
 /* 2) Global */
+*{ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
 body{
   font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color: var(--text);
@@ -216,6 +220,7 @@ h2,h3{
   overflow: hidden;
 }
 
+/* Satır */
 .rp-report-row{
   display: flex;
   gap: 12px;
@@ -224,6 +229,7 @@ h2,h3{
   border-radius: 12px;
 }
 
+/* zebra */
 .rp-report-row:nth-child(odd){
   background: rgba(17,24,39,.03);
 }
@@ -267,6 +273,60 @@ h2,h3{
   background: rgba(37,99,235,.08);
   border: 1px solid rgba(37,99,235,.18);
   margin: 6px 0 8px;
+}
+
+/* ✅ Badge / durum satırları */
+.rp-report-status{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  width: fit-content;
+  margin: 6px 0;
+  border: 1px solid rgba(229,231,235,.95);
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 10px 18px rgba(17,24,39,.06);
+}
+
+.rp-report-status.rp-başarılı,
+.rp-report-status.rp-basarili{
+  color: #166534;
+  background: rgba(22,163,74,.10);
+  border-color: rgba(22,163,74,.25);
+}
+
+.rp-report-status.rp-uyarı,
+.rp-report-status.rp-uyari{
+  color: #92400e;
+  background: rgba(245,158,11,.12);
+  border-color: rgba(245,158,11,.28);
+}
+
+.rp-report-status.rp-hata{
+  color: #991b1b;
+  background: rgba(239,68,68,.10);
+  border-color: rgba(239,68,68,.25);
+}
+
+.rp-report-status.rp-başarısız,
+.rp-report-status.rp-basarisiz{
+  color: #7f1d1d;
+  background: rgba(239,68,68,.10);
+  border-color: rgba(239,68,68,.25);
+}
+
+/* ✅ Emoji ile başlayan vurgulu satırlar */
+.rp-report-highlight{
+  padding: 10px 12px;
+  border-radius: 14px;
+  margin: 6px 0;
+  font-weight: 800;
+  color: rgba(17,24,39,.92);
+  background: rgba(37,99,235,.07);
+  border: 1px solid rgba(37,99,235,.18);
 }
 
 /* Mobilde key kolonu daralsın */
