@@ -1,4 +1,4 @@
-# analysis_engine.py — sağlamlaştırılmış sürüm
+# analysis_engine.py — sağlamlaştırılmış sürüm (OPTIMUM FIX + PRICE BUCKETING)
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -12,7 +12,7 @@ import json
 # -----------------------------
 def _as_chartjs_line(labels, y_values, label="Tahmini Toplam Kâr (TL)"):
     return json.dumps({
-        "labels": [round(x, 2) if isinstance(x, (int, float)) else x for x in labels],
+        "labels": [round(float(x), 2) if isinstance(x, (int, float, np.number)) else x for x in labels],
         "datasets": [{
             "label": label,
             "data": [round(float(y), 2) for y in y_values],
@@ -44,8 +44,92 @@ def _as_chartjs_bar(labels, data_a, label_a, data_b, label_b):
         ]
     })
 
+# ---------------------------------------------------
+# Kritik FIX: Fiyatları bucket'layıp gruplayacağız
+# ---------------------------------------------------
+def _round_to_step(x: float, step: float) -> float:
+    """
+    x değerini step aralığına yuvarlar.
+    Örn step=1 => 150.49 -> 150, 150.50 -> 151
+    """
+    if step <= 0:
+        return float(x)
+    return float(np.floor((float(x) / step) + 0.5) * step)
+
+# ---------------------------------------------------
+# Ortak veri çıkarımı: fiyat–satış ilişkisi tablosu
+# ---------------------------------------------------
+def _get_daily_sales_data(urun_id, price_step=1.0, lookback_days=None):
+    """
+    Çıktı kolonları:
+      ['ortalama_fiyat', 'toplam_adet', 'gun_sayisi', 'ortalama_adet']
+    En az 2 farklı fiyat noktası yoksa None döner.
+
+    price_step:
+      1.0 => 1 TL bucket
+      0.5 => 0.5 TL bucket
+    lookback_days:
+      None => tüm veri
+      int => son N gün
+    """
+    q = (db.session.query(
+            SatisKaydi.tarih,
+            SatisKaydi.adet,
+            SatisKaydi.hesaplanan_birim_fiyat
+        )
+        .filter_by(urun_id=urun_id))
+
+    rows = q.all()
+    if not rows or len(rows) < 2:
+        return None
+
+    df = pd.DataFrame(rows, columns=['tarih', 'adet', 'hesaplanan_birim_fiyat'])
+    df['tarih'] = pd.to_datetime(df['tarih'], errors='coerce')
+    df = df.dropna(subset=['tarih', 'adet', 'hesaplanan_birim_fiyat'])
+
+    if df.empty:
+        return None
+
+    # Son N gün filtresi (opsiyonel)
+    if lookback_days is not None:
+        cutoff = pd.Timestamp(datetime.now() - timedelta(days=int(lookback_days)))
+        df = df[df['tarih'] >= cutoff]
+        if df.empty:
+            return None
+
+    # Fiyat bucket: float gürültüsünü temizler
+    df['fiyat_bucket'] = df['hesaplanan_birim_fiyat'].apply(lambda v: _round_to_step(v, price_step))
+
+    # Günlük ortalama adet: aynı bucket kaç gün satılmış?
+    grp = df.groupby('fiyat_bucket').agg(
+        toplam_adet=('adet', 'sum'),
+        gun_sayisi=('tarih', 'nunique')
+    ).reset_index()
+
+    grp = grp[grp['gun_sayisi'] > 0]
+    if grp.empty:
+        return None
+
+    grp['ortalama_adet'] = grp['toplam_adet'] / grp['gun_sayisi']
+    grp['ortalama_fiyat'] = grp['fiyat_bucket'].astype(float)
+
+    # En az 2 farklı fiyat noktası şart
+    if grp['ortalama_fiyat'].nunique() < 2:
+        return None
+
+    # Çok küçük örnekleri at (tek gün/tek satış gibi)
+    # İstersen bu eşiği artırabilirsin.
+    grp = grp[grp['gun_sayisi'] >= 1].copy()
+    return grp.sort_values('ortalama_fiyat')
+
+# -----------------------------------------
+# Yardımcı: çizim için fiyat eğrisi üret
+# -----------------------------------------
+def _generate_price_curve_data_from_results(df_res):
+    return _as_chartjs_line(df_res['test_fiyati'].tolist(), df_res['tahmini_kar'].tolist())
+
 # ----------------------------------
-# Motor 1: Hedef Marj Hesaplayıcı
+# Motor 1: Hedef Marj
 # ----------------------------------
 def hesapla_hedef_marj(urun_ismi, hedef_marj_yuzdesi):
     try:
@@ -74,60 +158,8 @@ def hesapla_hedef_marj(urun_ismi, hedef_marj_yuzdesi):
     except Exception as e:
         return False, f"Hesaplama hatası: {e}", None
 
-# ---------------------------------------------------
-# Ortak veri çıkarımı: fiyat–satış ilişkisi tablosu
-# ---------------------------------------------------
-def _get_daily_sales_data(urun_id):
-    """
-    Girdi: urun_id
-    Çıktı: kolonlar -> ['ortalama_fiyat', 'toplam_adet', 'gun_sayisi', 'ortalama_adet']
-    En az 2 farklı fiyat noktası yoksa None döner.
-    """
-    q = (db.session.query(
-            SatisKaydi.tarih,
-            SatisKaydi.adet,
-            SatisKaydi.hesaplanan_birim_fiyat
-        )
-        .filter_by(urun_id=urun_id))
-
-    rows = q.all()
-    if not rows or len(rows) < 2:
-        return None
-
-    df = pd.DataFrame(rows, columns=['tarih', 'adet', 'hesaplanan_birim_fiyat'])
-    df['tarih'] = pd.to_datetime(df['tarih'])
-
-    grp = df.groupby('hesaplanan_birim_fiyat').agg(
-        toplam_adet=('adet', 'sum'),
-        gun_sayisi=('tarih', 'nunique')
-    ).reset_index()
-
-    grp['ortalama_adet'] = grp['toplam_adet'] / grp['gun_sayisi']
-    # Kritik: analizde hep 'ortalama_fiyat' ismini kullanacağız
-    grp['ortalama_fiyat'] = grp['hesaplanan_birim_fiyat']
-
-    # En az iki farklı fiyat noktası şart
-    if grp['ortalama_fiyat'].nunique() < 2:
-        return None
-    return grp
-
-# -----------------------------------------
-# Yardımcı: çizim için fiyat eğrisi üret
-# -----------------------------------------
-def _generate_price_curve_data(model, maliyet, referans_fiyat, simule_fiyat=None):
-    fiyat_min = float(maliyet) * 1.10
-    fiyat_max = float(referans_fiyat) * 2.0
-    if simule_fiyat is not None:
-        fiyat_max = max(fiyat_max, float(simule_fiyat) * 1.2)
-
-    price_points = np.linspace(fiyat_min, fiyat_max, 20)
-    demand = model.predict(price_points.reshape(-1, 1))
-    demand[demand < 0] = 0
-    profits = (price_points - float(maliyet)) * demand
-    return _as_chartjs_line(price_points, profits)
-
 # ----------------------------------
-# Motor 2: Fiyat Simülatörü
+# Motor 2: Fiyat Simülatörü (aynı FIX'ten faydalanır)
 # ----------------------------------
 def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
     with warnings.catch_warnings():
@@ -141,17 +173,17 @@ def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
             if maliyet <= 0:
                 return False, f"HATA: '{urun.isim}' ürününün maliyeti 0 TL. Lütfen reçeteleri tamamlayın.", None
 
-            df_g = _get_daily_sales_data(urun.id)
+            # FIX: bucket + son 180 gün mantıklı (istersen None yap)
+            df_g = _get_daily_sales_data(urun.id, price_step=1.0, lookback_days=180)
             if df_g is None or df_g.empty:
                 return False, f"HATA: '{urun.isim}' için en az 2 farklı fiyatta satış verisi bulunamadı.", None
 
-            # Mevcut durum (ortalama)
             mevcut_ortalama_fiyat = float(df_g['ortalama_fiyat'].mean())
-            mevcut_gunluk_satis = float(df_g['toplam_adet'].mean())
+            mevcut_gunluk_satis = float(df_g['ortalama_adet'].mean())
             mevcut_gunluk_kar = (mevcut_ortalama_fiyat - maliyet) * mevcut_gunluk_satis
 
             X = df_g[['ortalama_fiyat']]
-            y = df_g['toplam_adet']
+            y = df_g['ortalama_adet']  # FIX: günlük ortalama adet ile model kur
             model = LinearRegression().fit(X, y)
 
             if float(model.coef_[0]) >= 0:
@@ -169,7 +201,7 @@ def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
             rapor = (
                 f"--- MEVCUT DURUM (Geçmiş Ort.) ---\n"
                 f"  Ortalama Fiyat: {mevcut_ortalama_fiyat:.2f} TL\n"
-                f"  Günlük Satış: {mevcut_gunluk_satis:.1f} adet\n"
+                f"  Günlük Satış (Ort.): {mevcut_gunluk_satis:.1f} adet\n"
                 f"  Maliyet: {maliyet:.2f} TL\n"
                 f"  Tahmini Günlük Kâr: {mevcut_gunluk_kar:.2f} TL\n"
                 f"{'-'*50}\n"
@@ -181,14 +213,22 @@ def simule_et_fiyat_degisikligi(urun_ismi, test_edilecek_yeni_fiyat):
                 f"(Δ={kar_degisimi:.2f} TL)"
             )
 
-            chart_data = _generate_price_curve_data(model, maliyet, mevcut_ortalama_fiyat, yeni_fiyat)
+            # Grafik: fiyat aralığında kâr eğrisi
+            fiyat_min = maliyet * 1.10
+            fiyat_max = max(mevcut_ortalama_fiyat * 2.0, yeni_fiyat * 1.2)
+            test_prices = np.linspace(fiyat_min, fiyat_max, 60)
+            demand = model.predict(test_prices.reshape(-1, 1))
+            demand[demand < 0] = 0
+            profits = (test_prices - maliyet) * demand
+            chart_data = _as_chartjs_line(test_prices.tolist(), profits.tolist())
+
             return True, rapor, chart_data
 
         except Exception as e:
             return False, f"Simülasyon hatası: {e}", None
 
 # ----------------------------------
-# Motor 3: Optimum Fiyat
+# Motor 3: Optimum Fiyat (FIX + GUARDRAIL)
 # ----------------------------------
 def bul_optimum_fiyat(urun_ismi):
     with warnings.catch_warnings():
@@ -200,67 +240,102 @@ def bul_optimum_fiyat(urun_ismi):
 
             maliyet = float(urun.hesaplanan_maliyet or 0.0)
             mevcut_fiyat = float(urun.mevcut_satis_fiyati or 0.0)
+
             if maliyet <= 0:
                 return False, f"HATA: '{urun.isim}' ürününün maliyeti 0 TL. Lütfen reçete/hammaddeyi doldurun.", None
+            if mevcut_fiyat <= 0:
+                return False, f"HATA: '{urun.isim}' ürününün mevcut satış fiyatı 0 TL görünüyor. Ürün fiyatını girin.", None
 
-            df_g = _get_daily_sales_data(urun.id)
+            # FIX: son 180 gün + 1 TL bucket
+            df_g = _get_daily_sales_data(urun.id, price_step=1.0, lookback_days=180)
             if df_g is None or df_g.empty:
-                return False, f"HATA: '{urun.isim}' için analiz edecek yeterli veri yok.", None
+                return False, f"HATA: '{urun.isim}' için analiz edecek yeterli veri yok (en az 2 farklı fiyat lazım).", None
 
-            rapor = ""
-            model = None
-            if df_g['ortalama_fiyat'].nunique() < 2:
-                rapor += "UYARI: Ürün hep aynı fiyata satılmış. Talep modeli kurulamaz; sabit talep varsayılacak.\n\n"
-            else:
-                X = df_g[['ortalama_fiyat']]
-                y = df_g['toplam_adet']
-                model = LinearRegression().fit(X, y)
-                if float(model.coef_[0]) >= 0:
-                    rapor += "UYARI: Model eğimi pozitif. Veri yetersiz/hatalı olabilir.\n"
+            # Modeli günlük ortalama adet üzerinden kur
+            X = df_g[['ortalama_fiyat']]
+            y = df_g['ortalama_adet']
+            model = LinearRegression().fit(X, y)
 
-            # Aralık
-            min_fiyat = max(maliyet * 1.10, float(df_g['ortalama_fiyat'].min()) * 0.8)
-            max_fiyat = float(df_g['ortalama_fiyat'].max()) * 1.5
-            test_prices = np.linspace(min_fiyat, max_fiyat, 100)
+            # Eğer eğim pozitifse, optimum güvenilmez
+            pozitif_egim = float(model.coef_[0]) >= 0
 
-            results = []
-            for p in test_prices:
-                if model is not None:
-                    tahmini_adet = float(model.predict(np.array([[p]]))[0])
-                else:
-                    tahmini_adet = float(df_g['toplam_adet'].mean())
-                tahmini_adet = max(0.0, tahmini_adet)
-                tahmini_kar = (p - maliyet) * tahmini_adet
-                results.append((p, tahmini_adet, tahmini_kar))
+            # Test aralığı: veriye yakın kalsın (uçuk extrapolation yapmasın)
+            min_obs = float(df_g['ortalama_fiyat'].min())
+            max_obs = float(df_g['ortalama_fiyat'].max())
 
-            if not results:
-                return False, "HATA: Hiçbir sonuç hesaplanamadı.", None
+            min_fiyat = max(maliyet * 1.10, min_obs * 0.90)
+            max_fiyat = max_obs * 1.25
 
-            df_res = pd.DataFrame(results, columns=['test_fiyati', 'tahmini_adet', 'tahmini_kar'])
+            # Eğer mevcut fiyat gözlem aralığının dışındaysa, onu da kapsa
+            min_fiyat = min(min_fiyat, mevcut_fiyat * 0.90)
+            max_fiyat = max(max_fiyat, mevcut_fiyat * 1.10)
+
+            test_prices = np.linspace(min_fiyat, max_fiyat, 120)
+
+            # Tahmin
+            demand = model.predict(test_prices.reshape(-1, 1))
+            demand = np.maximum(demand, 0.0)
+
+            profits = (test_prices - maliyet) * demand
+
+            df_res = pd.DataFrame({
+                'test_fiyati': test_prices,
+                'tahmini_adet': demand,
+                'tahmini_kar': profits
+            })
+
             optimum = df_res.loc[df_res['tahmini_kar'].idxmax()]
 
-            # Mevcut kâr: mevcut fiyata en yakın gözlem yerine, ortalama düzey kullanmak daha istikrarlı
-            mevcut_gunluk_satis = float(df_g['toplam_adet'].mean())
-            mevcut_kar = (mevcut_fiyat - maliyet) * mevcut_gunluk_satis
+            # Mevcut fiyatta model kârı (kıyas için)
+            mevcut_talep_hat = max(0.0, float(model.predict(np.array([[mevcut_fiyat]]))[0]))
+            mevcut_kar_hat = (mevcut_fiyat - maliyet) * mevcut_talep_hat
 
-            rapor += (
-                f"--- MEVCUT DURUM ---\n"
-                f"  Mevcut Fiyat: {mevcut_fiyat:.2f} TL\n"
-                f"  Ortalama Günlük Kâr: {mevcut_kar:.2f} TL\n\n"
-                f"--- OPTİMUM FİYAT ---\n"
-                f"  🏆 Önerilen Fiyat: {optimum['test_fiyati']:.2f} TL\n"
-                f"  Tahmini Satış: {optimum['tahmini_adet']:.1f} adet/gün\n"
-                f"  Tahmini Maks. Kâr: {optimum['tahmini_kar']:.2f} TL/gün"
+            # Ayrıca geçmiş gerçek veriden "günlük gerçek kâr" tahmini (daha sağlam baseline)
+            # (fiyat bucketlara göre gittiği için, en yakın bucketı kullan)
+            nearest_idx = (df_g['ortalama_fiyat'] - mevcut_fiyat).abs().idxmin()
+            obs_price = float(df_g.loc[nearest_idx, 'ortalama_fiyat'])
+            obs_daily_qty = float(df_g.loc[nearest_idx, 'ortalama_adet'])
+            obs_daily_profit = (obs_price - maliyet) * obs_daily_qty
+
+            # Guardrail: optimum kâr, mevcut (gerçek baseline) kârdan düşükse uyar
+            rapor_uyari = ""
+            if pozitif_egim:
+                rapor_uyari += (
+                    "⚠️ UYARI: Model eğimi pozitif çıktı (fiyat artınca satış artıyor gibi). "
+                    "Bu genelde veri gürültüsü/az veri demektir. Sonuç temkinli yorumlanmalı.\n\n"
+                )
+
+            if float(optimum['tahmini_kar']) < obs_daily_profit:
+                rapor_uyari += (
+                    "⚠️ UYARI: Modelin bulduğu optimum kâr, geçmiş veride mevcut fiyata en yakın noktadaki "
+                    "günlük kârdan düşük. Bu genelde indirim/kampanya/fiyat gürültüsü nedeniyle olur.\n"
+                    "✅ ÖNERİ: Şimdilik mevcut fiyatı koruyun veya daha kontrollü farklı fiyat denemeleriyle veri toplayın.\n\n"
+                )
+
+            rapor = (
+                f"{rapor_uyari}"
+                f"--- MEVCUT DURUM (Veriden Baseline) ---\n"
+                f"  Mevcut Liste Fiyatı: {mevcut_fiyat:.2f} TL\n"
+                f"  (Veride en yakın fiyat: {obs_price:.2f} TL)\n"
+                f"  Günlük Satış (Veri): {obs_daily_qty:.1f} adet/gün\n"
+                f"  Günlük Kâr (Veri): {obs_daily_profit:.2f} TL/gün\n\n"
+                f"--- MODEL TAHMİNİ (Mevcut Fiyat) ---\n"
+                f"  Tahmini Satış: {mevcut_talep_hat:.1f} adet/gün\n"
+                f"  Tahmini Günlük Kâr: {mevcut_kar_hat:.2f} TL/gün\n\n"
+                f"--- OPTİMUM FİYAT (Model) ---\n"
+                f"  🏆 Önerilen Fiyat: {float(optimum['test_fiyati']):.2f} TL\n"
+                f"  Tahmini Satış: {float(optimum['tahmini_adet']):.1f} adet/gün\n"
+                f"  Tahmini Maks. Kâr: {float(optimum['tahmini_kar']):.2f} TL/gün"
             )
 
-            chart_data = _as_chartjs_line(df_res['test_fiyati'].tolist(),
-                                          df_res['tahmini_kar'].tolist())
+            chart_data = _generate_price_curve_data_from_results(df_res)
             return True, rapor, chart_data
+
         except Exception as e:
             return False, f"Optimizasyon hatası: {e}", None
 
 # ---------------------------------------------------------
-# Motor 4/5: Kategori / Grup (yamyamlık) karşılaştırmaları
+# Motor 4/5: Kategori / Grup (aynı)
 # ---------------------------------------------------------
 def _get_sales_by_filter(column_name, value):
     q = (db.session.query(
@@ -302,11 +377,11 @@ def analiz_et_kategori_veya_grup(tip, isim, gun_sayisi=7):
     try:
         if tip == 'kategori':
             df = _get_sales_by_filter('kategori', isim)
-            grup_kolonu = 'isim'            # kategori içi ürünler
+            grup_kolonu = 'isim'
             baslik = f"KATEGORİ ANALİZİ: {isim}"
         elif tip == 'kategori_grubu':
             df = _get_sales_by_filter('kategori_grubu', isim)
-            grup_kolonu = 'kategori'        # grup içi kategoriler
+            grup_kolonu = 'kategori'
             baslik = f"KATEGORİ GRUBU ANALİZİ: {isim}"
         else:
             return False, "HATA: Geçersiz analiz tipi.", None
