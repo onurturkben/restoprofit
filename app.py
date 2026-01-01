@@ -1,4 +1,5 @@
 # app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
+# NOT: Bu sürümde /add-recipe endpoint'i "çoklu satır" (r_hammadde_id[] / r_miktar[]) destekler.
 
 import os
 import re
@@ -42,6 +43,7 @@ from analysis_engine import (
 )
 
 EMOJI_RX = re.compile(r'[\U0001F300-\U0001FAFF\U00002700-\U000027BF]+', flags=re.UNICODE)
+
 
 def strip_emojis(text: str) -> str:
     if not isinstance(text, str):
@@ -253,9 +255,6 @@ def create_app():
 
     # -------------------------
     # DASHBOARD
-    # ÖNEMLİ: base.html'de url_for('index') varsa kırılmasın diye:
-    # '/' route'un endpoint'i 'index' olarak da tanımlandı.
-    # Aynı fonksiyon ayrıca '/dashboard' endpoint='dashboard' ile de erişilebilir.
     # -------------------------
     @app.route('/', endpoint='index')
     @app.route('/dashboard', endpoint='dashboard')
@@ -270,12 +269,13 @@ def create_app():
             flash(f'Veritabanı bağlantı hatası: {e}', 'danger')
 
         return render_template('dashboard.html', title='Ana Ekran', summary=summary)
-        # Menü Yönetimi alias (base.html url_for('menu_yonetimi') kırılmasın diye)
+
+    # Menü Yönetimi alias
     @app.route('/menu-yonetimi')
     @login_required
     def menu_yonetimi():
         return redirect(url_for('admin_panel'))
-    
+
     # Excel yükleme
     @app.route('/upload-excel', methods=['POST'])
     @login_required
@@ -599,36 +599,110 @@ def create_app():
             flash(f"Silme hatası: {e}", 'danger')
         return redirect(url_for('admin_panel'))
 
+    # ✅ FIX: Çoklu reçete satırı destekli add_recipe
     @app.route('/add-recipe', methods=['POST'])
     @login_required
     def add_recipe():
         urun_id = safe_int(request.form.get('r_urun_id'))
-        hammadde_id = safe_int(request.form.get('r_hammadde_id'))
-        miktar = parse_decimal(request.form.get('r_miktar'))
-
-        if not urun_id or not hammadde_id or miktar is None:
-            flash("Ürün, hammadde ve miktar zorunludur.", 'danger')
+        if not urun_id:
+            flash("Ürün seçimi zorunludur.", 'danger')
             return redirect(url_for('admin_panel'))
-        if miktar <= 0:
-            flash("Miktar pozitif olmalıdır.", 'danger')
+
+        # Yeni modal çoklu alan gönderiyor: r_hammadde_id[] ve r_miktar[]
+        hammadde_ids = request.form.getlist('r_hammadde_id[]')
+        miktarlar = request.form.getlist('r_miktar[]')
+
+        # Eski modal/sistemle uyumluluk (tekli alan gelirse)
+        if not hammadde_ids and request.form.get('r_hammadde_id') is not None:
+            hammadde_ids = [request.form.get('r_hammadde_id')]
+            miktarlar = [request.form.get('r_miktar')]
+
+        if not hammadde_ids:
+            flash("En az 1 hammadde satırı eklemelisiniz.", 'danger')
+            return redirect(url_for('admin_panel'))
+
+        # Satırları normalize et: (hammadde_id -> miktar)
+        # Aynı hammadde birden fazla kez seçildiyse miktarları topluyoruz.
+        normalized: dict[int, float] = {}
+        skipped = 0
+
+        # Güvenlik: uzunluk farkı varsa kısa olana kadar işle
+        n = min(len(hammadde_ids), len(miktarlar)) if miktarlar else len(hammadde_ids)
+
+        for i in range(n):
+            hid = safe_int(hammadde_ids[i])
+            mikt = parse_decimal(miktarlar[i] if miktarlar else None)
+
+            if not hid or mikt is None or mikt <= 0:
+                skipped += 1
+                continue
+
+            normalized[hid] = float(normalized.get(hid, 0.0) + float(mikt))
+
+        if not normalized:
+            flash("Geçerli bir hammadde/miktar satırı bulunamadı.", 'danger')
             return redirect(url_for('admin_panel'))
 
         try:
-            existing = db.session.scalar(
-                db.select(Recete).where(Recete.urun_id == urun_id, Recete.hammadde_id == hammadde_id)
+            # Ürün var mı?
+            urun = db.session.get(Urun, urun_id)
+            if not urun:
+                flash("Seçilen ürün bulunamadı.", 'danger')
+                return redirect(url_for('admin_panel'))
+
+            # Hammadde var mı? (gönderilen id'leri doğrula)
+            valid_h_ids = set(
+                db.session.scalars(
+                    db.select(Hammadde.id).where(Hammadde.id.in_(list(normalized.keys())))
+                ).all()
             )
-            if existing:
-                existing.miktar = miktar
-                flash("Reçete kalemi mevcuttu, miktar güncellendi.", 'warning')
-            else:
-                db.session.add(Recete(urun_id=urun_id, hammadde_id=hammadde_id, miktar=miktar))
-                flash("Reçete kalemi eklendi.", 'success')
+            if not valid_h_ids:
+                flash("Seçilen hammaddeler bulunamadı.", 'danger')
+                return redirect(url_for('admin_panel'))
+
+            # DB'de olmayan hammadde id'leri gönderildiyse filtrele
+            missing_ids = [hid for hid in normalized.keys() if hid not in valid_h_ids]
+            for hid in missing_ids:
+                normalized.pop(hid, None)
+                skipped += 1
+
+            if not normalized:
+                flash("Geçerli hammadde kalmadı.", 'danger')
+                return redirect(url_for('admin_panel'))
+
+            added = 0
+            updated = 0
+
+            # Mevcut kalemleri bir kerede çek
+            existing_rows = db.session.scalars(
+                db.select(Recete).where(
+                    Recete.urun_id == urun_id,
+                    Recete.hammadde_id.in_(list(normalized.keys()))
+                )
+            ).all()
+            existing_map = {r.hammadde_id: r for r in existing_rows}
+
+            # Upsert
+            for hid, mikt in normalized.items():
+                if hid in existing_map:
+                    existing_map[hid].miktar = float(mikt)
+                    updated += 1
+                else:
+                    db.session.add(Recete(urun_id=urun_id, hammadde_id=hid, miktar=float(mikt)))
+                    added += 1
 
             db.session.commit()
             guncelle_tum_urun_maliyetleri()
+
+            msg = f"Reçete kaydedildi. Eklenen: {added}, Güncellenen: {updated}."
+            if skipped:
+                msg += f" Atlanan satır: {skipped}."
+            flash(msg, 'success')
+
         except Exception as e:
             db.session.rollback()
             flash(f"Reçete hatası: {e}", 'danger')
+
         return redirect(url_for('admin_panel'))
 
     @app.route('/edit-recipe/<int:id>', methods=['POST'])
