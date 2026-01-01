@@ -62,7 +62,7 @@ body{
   text-decoration: none;
 }
 
-/* ✅ Logo boyutu (artık 72px değil) */
+/* ✅ Logo boyutu */
 .navbar .navbar-brand .rp-logo{
   height: var(--logo-h);
   width: auto;
@@ -201,4 +201,78 @@ h2,h3{
 
 .modal-footer{
   border-top: 1px solid rgba(229,231,235,.85) !important;
+}
+
+/* =========================================================
+   10) ✅ Analiz Sonuç Raporu (Python pre yerine şık görünüm)
+   Kullanım: reports.html içindeki .rp-report
+   ========================================================= */
+.rp-report{
+  border: 1px solid rgba(229,231,235,.95);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(246,247,251,.9) 0%, rgba(255,255,255,.96) 55%);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 14px;
+  overflow: hidden;
+}
+
+.rp-report-row{
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  border-radius: 12px;
+}
+
+.rp-report-row:nth-child(odd){
+  background: rgba(17,24,39,.03);
+}
+
+.rp-report-k{
+  flex: 0 0 260px;
+  max-width: 260px;
+  font-weight: 700;
+  color: rgba(17,24,39,.82);
+}
+
+.rp-report-v{
+  flex: 1;
+  font-weight: 600;
+  color: rgba(17,24,39,.92);
+  word-break: break-word;
+}
+
+.rp-report-text{
+  padding: 8px 10px;
+  color: rgba(17,24,39,.80);
+  font-weight: 600;
+}
+
+.rp-report-gap{
+  height: 10px;
+}
+
+.rp-report-divider{
+  height: 1px;
+  background: rgba(229,231,235,.95);
+  margin: 10px 0;
+}
+
+.rp-report-section{
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: rgba(17,24,39,.92);
+  padding: 10px 10px 6px;
+  border-radius: 12px;
+  background: rgba(37,99,235,.08);
+  border: 1px solid rgba(37,99,235,.18);
+  margin: 6px 0 8px;
+}
+
+/* Mobilde key kolonu daralsın */
+@media (max-width: 768px){
+  .rp-report-k{
+    flex-basis: 160px;
+    max-width: 160px;
+  }
 }
