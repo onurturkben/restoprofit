@@ -1,13 +1,18 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Ana Ekran</h1>
+<header class="mb-4">
+  <h1 class="fw-bold" style="font-size:32px; line-height:40px;">Ana Ekran</h1>
+  <p class="text-muted mb-0">
+    Son {{ days_window or 30 }} güne göre özet ve hızlı içgörüler.
+  </p>
+</header>
 
 <div class="row g-3 mb-4">
   <div class="col-12 col-md-6">
     <div class="rp-card rp-shadow h-100">
       <div class="rp-card-body">
-        <h3>Toplam Ürün</h3>
+        <h3 class="h5 fw-bold mb-1">Toplam Ürün</h3>
         <p class="display-6 m-0">{{ summary.toplam_urun }} <small class="text-muted">adet</small></p>
       </div>
     </div>
@@ -15,23 +20,101 @@
   <div class="col-12 col-md-6">
     <div class="rp-card rp-shadow h-100">
       <div class="rp-card-body">
-        <h3>Toplam Satış Kaydı</h3>
+        <h3 class="h5 fw-bold mb-1">Toplam Satış Kaydı</h3>
         <p class="display-6 m-0">{{ summary.toplam_satis_kaydi }} <small class="text-muted">adet</small></p>
       </div>
     </div>
   </div>
 </div>
 
+<!-- ✅ En iyi / En kötü 3 ürün -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-6">
+    <div class="rp-card rp-shadow h-100">
+      <div class="rp-card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h2 class="h5 fw-bold m-0">En İyi 3 Ürün</h2>
+          <span class="badge text-bg-success">Marj ↑</span>
+        </div>
+        <p class="text-muted small mb-3">Son {{ days_window or 30 }} gün / kâr marjına göre</p>
+
+        {% if best_products and best_products|length %}
+          <div class="list-group list-group-flush">
+            {% for p in best_products %}
+              <div class="list-group-item px-0 d-flex align-items-start justify-content-between">
+                <div class="me-3">
+                  <div class="fw-bold">{{ loop.index }}. {{ p.urun_adi }}</div>
+                  <div class="text-muted small">
+                    Adet: {{ p.adet }} · Ciro: {{ "%.2f"|format(p.ciro) }} TL · Kâr: {{ "%.2f"|format(p.kar) }} TL
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="fw-bold">%{{ "%.1f"|format(p.marj) }}</div>
+                  <div class="text-muted small">marj</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="alert alert-light mb-0" role="alert">
+            Bu aralıkta satış verisi bulunamadı. (Excel yükledikten sonra görünür.)
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="rp-card rp-shadow h-100">
+      <div class="rp-card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h2 class="h5 fw-bold m-0">En Kötü 3 Ürün</h2>
+          <span class="badge text-bg-danger">Marj ↓</span>
+        </div>
+        <p class="text-muted small mb-3">Son {{ days_window or 30 }} gün / kâr marjına göre</p>
+
+        {% if worst_products and worst_products|length %}
+          <div class="list-group list-group-flush">
+            {% for p in worst_products %}
+              <div class="list-group-item px-0 d-flex align-items-start justify-content-between">
+                <div class="me-3">
+                  <div class="fw-bold">{{ loop.index }}. {{ p.urun_adi }}</div>
+                  <div class="text-muted small">
+                    Adet: {{ p.adet }} · Ciro: {{ "%.2f"|format(p.ciro) }} TL · Kâr: {{ "%.2f"|format(p.kar) }} TL
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="fw-bold">%{{ "%.1f"|format(p.marj) }}</div>
+                  <div class="text-muted small">marj</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="alert alert-light mb-0" role="alert">
+            Bu aralıkta satış verisi bulunamadı. (Excel yükledikten sonra görünür.)
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Excel yükleme kartı (mevcut) -->
 <div class="rp-card rp-shadow">
   <div class="rp-card-body">
-    <h2>Yeni Satış Raporu Yükle</h2>
-    <p class="text-muted">Adisyon sisteminizden aldığınız <code>.xlsx/.xls</code> dosyasını yükleyin.</p>
+    <h2 class="h5 fw-bold mb-2">Yeni Satış Raporu Yükle</h2>
+    <p class="text-muted mb-1">Adisyon sisteminizden aldığınız <code>.xlsx/.xls</code> dosyasını yükleyin.</p>
     <p class="text-muted small mb-4">Gerekli kolonlar: <code>Urun_Adi</code>, <code>Adet</code>, <code>Toplam_Tutar</code>, <code>Tarih</code></p>
 
-    <form method="POST" action="{{ url_for('upload_excel') }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-16">
+    <form method="POST" action="{{ url_for('upload_excel') }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2">
       <input class="form-control" style="max-width:420px;" type="file" name="excel_file" accept=".xlsx,.xls" required>
       <button class="btn btn-success">Yükle ve İşle</button>
     </form>
+
+    <div class="text-muted small mt-3">
+      İpucu: Son 7 gün görmek için <code>/dashboard?days=7</code> yazabilirsin.
+    </div>
   </div>
 </div>
 {% endblock %}
