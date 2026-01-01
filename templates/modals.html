@@ -142,45 +142,114 @@
   </div>
 </div>
 
-<!-- Reçete Ekle -->
+<!-- Reçete Ekle (ÇOKLU) -->
 <div class="modal fade" id="modalAddRecipe" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <form class="modal-content" method="POST" action="{{ url_for('add_recipe') }}">
       <div class="modal-header">
-        <h5 class="modal-title fw-bold">Reçeteye Hammadde Ekle</h5>
+        <h5 class="modal-title fw-bold">Reçete Oluştur (Birden Fazla Hammadde)</h5>
         <button class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
       </div>
+
       <div class="modal-body">
         <div class="mb-3">
           <label class="form-label">Ürün</label>
           <select name="r_urun_id" class="form-select" required>
             <option value="" disabled selected>Seçin…</option>
             {% for u in urunler %}
-            <option value="{{ u.id }}">{{ u.isim }}</option>
+              <option value="{{ u.id }}">{{ u.isim }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Hammadde</label>
-          <select name="r_hammadde_id" class="form-select" required>
-            <option value="" disabled selected>Seçin…</option>
-            {% for h in hammaddeler %}
-            <option value="{{ h.id }}">{{ h.isim }} ({{ h.maliyet_birimi }})</option>
-            {% endfor %}
-          </select>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <strong>Hammaddeler</strong>
+          <button type="button" class="btn btn-sm btn-outline-dark" id="addRecipeRowBtn">+ Satır Ekle</button>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Miktar</label>
-          <input name="r_miktar" type="number" step="0.001" min="0" class="form-control" placeholder="0.150" required>
+
+        <div id="recipeRows" class="d-grid gap-2">
+          <!-- İlk satır -->
+          <div class="row g-2 recipe-row">
+            <div class="col-12 col-md-7">
+              <label class="form-label d-md-none">Hammadde</label>
+              <select name="r_hammadde_id[]" class="form-select" required>
+                <option value="" disabled selected>Hammadde seçin…</option>
+                {% for h in hammaddeler %}
+                  <option value="{{ h.id }}">{{ h.isim }} ({{ h.maliyet_birimi }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-8 col-md-3">
+              <label class="form-label d-md-none">Miktar</label>
+              <input name="r_miktar[]" type="number" step="0.001" min="0" class="form-control" placeholder="Miktar" required>
+            </div>
+
+            <div class="col-4 col-md-2 d-grid">
+              <label class="form-label d-md-none">&nbsp;</label>
+              <button type="button" class="btn btn-outline-danger removeRecipeRowBtn" disabled>Sil</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-muted small mt-3">
+          Adet bazlı çalışıyorsan miktarları 1, 2, 0.5 gibi girebilirsin.
         </div>
       </div>
+
       <div class="modal-footer">
         <button class="btn btn-light" data-bs-dismiss="modal" type="button">İptal</button>
-        <button class="btn btn-success" type="submit">Ekle</button>
+        <button class="btn btn-success" type="submit">Reçeteyi Kaydet</button>
       </div>
     </form>
   </div>
 </div>
+
+<script>
+(function(){
+  const rowsWrap = document.getElementById('recipeRows');
+  const addBtn = document.getElementById('addRecipeRowBtn');
+  if(!rowsWrap || !addBtn) return;
+
+  const updateRemoveButtons = () => {
+    const rowCount = rowsWrap.querySelectorAll('.recipe-row').length;
+    rowsWrap.querySelectorAll('.removeRecipeRowBtn').forEach(btn => {
+      btn.disabled = (rowCount === 1);
+    });
+  };
+
+  addBtn.addEventListener('click', () => {
+    const first = rowsWrap.querySelector('.recipe-row');
+    if(!first) return;
+
+    const clone = first.cloneNode(true);
+    const sel = clone.querySelector('select[name="r_hammadde_id[]"]');
+    const inp = clone.querySelector('input[name="r_miktar[]"]');
+    const del = clone.querySelector('.removeRecipeRowBtn');
+
+    if(sel) sel.value = "";
+    if(inp) inp.value = "";
+    if(del) del.disabled = false;
+
+    rowsWrap.appendChild(clone);
+    updateRemoveButtons();
+  });
+
+  rowsWrap.addEventListener('click', (e) => {
+    const btn = e.target.closest('.removeRecipeRowBtn');
+    if(!btn) return;
+    const row = btn.closest('.recipe-row');
+    if(!row) return;
+
+    if(rowsWrap.querySelectorAll('.recipe-row').length > 1) {
+      row.remove();
+      updateRemoveButtons();
+    }
+  });
+
+  updateRemoveButtons();
+})();
+</script>
 
 <!-- Reçete Düzenle -->
 <div class="modal fade" id="modalEditRecipe" tabindex="-1" aria-hidden="true">
