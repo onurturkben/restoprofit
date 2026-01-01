@@ -62,7 +62,6 @@
 <body>
 <nav class="navbar navbar-expand-lg">
   <div class="container container-main">
-    <!-- FIX: Logo artık Admin'e değil Dashboard'a gidiyor -->
     <a class="navbar-brand brand" href="{{ url_for('dashboard') }}" aria-label="RestoProfit">
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-text">RestoProfit</span>
@@ -75,7 +74,6 @@
 
     <div class="collapse navbar-collapse" id="topNav">
       <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-        <!-- FIX: Ana Ekran artık dashboard'a gidiyor -->
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('dashboard') }}">Ana Ekran</a>
         </li>
@@ -84,7 +82,6 @@
           <a class="nav-link" href="{{ url_for('reports') }}">Analiz Motorları</a>
         </li>
 
-        <!-- Menü Yönetimi: direkt admin panel -->
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('admin_panel') }}">Menü Yönetimi</a>
         </li>
@@ -119,5 +116,9 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+{# ✅ KRİTİK: Sayfa bazlı scriptler (admin.html içindeki modal doldurma JS'i gibi) buraya basılır #}
+{% block scripts %}{% endblock %}
+
 </body>
 </html>
