@@ -22,12 +22,15 @@
   --shadow: 0 12px 30px rgba(17,24,39,.10);
   --shadow-sm: 0 8px 18px rgba(17,24,39,.08);
 
-  /* Logo yüksekliği */
+  /* ✅ Logo yüksekliği (tek yerden kontrol) */
   --logo-h: 34px;
 }
 
 /* 2) Global */
-*{ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+*{
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 html, body{ height: 100%; }
 
@@ -37,8 +40,10 @@ body{
   background: linear-gradient(180deg, var(--soft) 0%, #fff 45%);
 }
 
+/* container-main varsa aynı kalsın */
 .container-main{ max-width:1100px; }
 
+/* code görünümleri */
 code{
   font-size: .92em;
   padding: .1rem .35rem;
@@ -48,20 +53,31 @@ code{
 }
 
 /* Başlıklar */
-h1{ font-weight: 900; letter-spacing: -0.02em; }
-h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
+h1{
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+h2,h3{
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
 
-.text-muted{ color: var(--muted) !important; }
+.text-muted{
+  color: var(--muted) !important;
+}
 
-/* 3) Navbar */
+/* 3) Navbar görünümü */
 .navbar{
   border-bottom:1px solid rgba(229,231,235,.9) !important;
   background: rgba(255,255,255,.92) !important;
   backdrop-filter: saturate(180%) blur(10px);
+
+  /* daha kompakt */
   padding-top: 6px;
   padding-bottom: 6px;
 }
 
+/* Bootstrap 5 toggler */
 .navbar-toggler{
   border: 1px solid rgba(17,24,39,.15);
   border-radius: 12px;
@@ -72,22 +88,27 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   height: 1.2em;
 }
 
-/* Brand */
+/* BRAND */
 .brand{
   display: inline-flex;
   align-items: center;
   gap: 12px;
   text-decoration: none;
 }
+
+/* Logo */
 .navbar .navbar-brand .rp-logo{
   height: var(--logo-h);
   width: auto;
   display: block;
   object-fit: contain;
 }
+
+/* Mobil logo */
 @media (max-width: 576px){
   :root{ --logo-h: 30px; }
 }
+
 .brand:hover{ opacity: .96; }
 
 /* Navbar linkleri */
@@ -100,11 +121,13 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   transition: all .15s ease;
   text-decoration: none;
 }
+
 .navbar .nav-link:hover{
   opacity: 1;
   background: rgba(17,24,39,.06);
   text-decoration: none;
 }
+
 .navbar .nav-link.active{
   opacity: 1;
   font-weight: 800;
@@ -122,15 +145,21 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   background: rgba(255,255,255,.92) !important;
 }
 
-.rp-card-body, .card-body{ padding: 22px; }
+.rp-card-body, .card-body{
+  padding: 22px;
+}
 
-/* Eğer dashboard.html'de rp-shadow class'ı varsa, garanti altına al */
-.rp-shadow{ box-shadow: var(--shadow-sm) !important; }
+/* dashboard'da rp-shadow kullanılıyorsa garanti */
+.rp-shadow{
+  box-shadow: var(--shadow-sm) !important;
+}
 
-/* Kart hover (çok hafif) */
+/* kart hover (çok hafif, layout bozmasın diye transition burada) */
+.rp-card, .card{
+  transition: transform .15s ease, box-shadow .15s ease;
+}
 .rp-card:hover, .card:hover{
   transform: translateY(-1px);
-  transition: transform .15s ease;
 }
 
 /* 5) Butonlar */
@@ -172,12 +201,15 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   color: #374151;
   border-bottom: 1px solid rgba(229,231,235,.9) !important;
 }
+
 .table tbody td{
   border-top: 1px solid rgba(229,231,235,.7) !important;
 }
+
 .table tbody tr:hover{
   background: rgba(37,99,235,.04) !important;
 }
+
 .table-responsive{
   border-radius: var(--radius) !important;
   overflow: hidden;
@@ -196,9 +228,11 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   border:1px solid rgba(229,231,235,.95) !important;
   box-shadow: var(--shadow);
 }
+
 .modal-header{
   border-bottom: 1px solid rgba(229,231,235,.85) !important;
 }
+
 .modal-footer{
   border-top: 1px solid rgba(229,231,235,.85) !important;
 }
@@ -214,6 +248,7 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   padding: 14px 14px;
   overflow: hidden;
 }
+
 .rp-report-row{
   display: flex;
   gap: 12px;
@@ -221,30 +256,40 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   padding: 9px 10px;
   border-radius: 12px;
 }
-.rp-report-row:nth-child(odd){ background: rgba(17,24,39,.03); }
+
+/* zebra */
+.rp-report-row:nth-child(odd){
+  background: rgba(17,24,39,.03);
+}
+
 .rp-report-k{
   flex: 0 0 260px;
   max-width: 260px;
   font-weight: 700;
   color: rgba(17,24,39,.82);
 }
+
 .rp-report-v{
   flex: 1;
   font-weight: 600;
   color: rgba(17,24,39,.92);
   word-break: break-word;
 }
+
 .rp-report-text{
   padding: 8px 10px;
   color: rgba(17,24,39,.80);
   font-weight: 600;
 }
+
 .rp-report-gap{ height: 10px; }
+
 .rp-report-divider{
   height: 1px;
   background: rgba(229,231,235,.95);
   margin: 10px 0;
 }
+
 .rp-report-section{
   font-weight: 900;
   letter-spacing: -0.01em;
@@ -255,8 +300,12 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   border: 1px solid rgba(37,99,235,.18);
   margin: 6px 0 8px;
 }
+
 @media (max-width: 768px){
-  .rp-report-k{ flex-basis: 160px; max-width: 160px; }
+  .rp-report-k{
+    flex-basis: 160px;
+    max-width: 160px;
+  }
 }
 
 /* =========================================================
@@ -264,7 +313,7 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
    (dashboard.html'e dokunmadan çalışır)
    ========================================================= */
 
-/* baştaki küçük "badge"leri modernleştir */
+/* Bootstrap badge'leri modernleştir */
 .badge.text-bg-success,
 .badge.text-bg-danger{
   border-radius: 999px;
@@ -279,26 +328,26 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   border-top: 1px solid rgba(229,231,235,.75);
 }
 
-/* her item'ı kart gibi hissettir */
+/* item görünümü */
 .list-group-item{
   border: 0 !important;
   border-bottom: 1px solid rgba(229,231,235,.65) !important;
   background: transparent !important;
   padding-top: 12px !important;
   padding-bottom: 12px !important;
+  border-radius: 12px; /* hover’da da yumuşak görünsün */
 }
 
 .list-group-item:last-child{
   border-bottom: 0 !important;
 }
 
-/* item hover */
+/* hover */
 .list-group-item:hover{
   background: rgba(37,99,235,.04) !important;
-  border-radius: 12px;
 }
 
-/* sağdaki yüzde alanı daha düzgün hizalansın */
+/* yüzde alanı daha düzgün */
 .list-group-item .text-end .fw-bold{
   font-variant-numeric: tabular-nums;
 }
@@ -308,14 +357,14 @@ h2,h3{ font-weight: 800; letter-spacing: -0.01em; }
   line-height: 1.35;
 }
 
-/* "Excel yükleyince görünür" alert'i daha yumuşak */
+/* dashboard alert yumuşat */
 .alert.alert-light{
   background: rgba(17,24,39,.02) !important;
   border: 1px dashed rgba(229,231,235,.9) !important;
   color: rgba(17,24,39,.78);
 }
 
-/* Dashboard üstteki sayılar (display-6) daha dengeli */
+/* dashboard sayılar */
 .display-6{
   font-weight: 900;
   letter-spacing: -0.02em;
