@@ -1,29 +1,92 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<header class="mb-4">
-  <h1 class="fw-bold" style="font-size:32px; line-height:40px;">Ana Ekran</h1>
-  <p class="text-muted mb-0">
-    Son {{ days_window or 30 }} güne göre özet ve hızlı içgörüler.
-  </p>
+<header class="mb-4 d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2">
+  <div>
+    <h1 class="fw-bold mb-1" style="font-size:32px; line-height:40px;">Ana Ekran</h1>
+    <p class="text-muted mb-0">
+      Son {{ days_window or 30 }} güne göre özet ve hızlı içgörüler.
+    </p>
+  </div>
+
+  <!-- ✅ Hızlı filtre linkleri -->
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('dashboard', days=7) }}">7 gün</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('dashboard', days=30) }}">30 gün</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('dashboard', days=90) }}">90 gün</a>
+  </div>
 </header>
 
+<!-- ✅ Üst özet kartları -->
 <div class="row g-3 mb-4">
   <div class="col-12 col-md-6">
     <div class="rp-card rp-shadow h-100">
-      <div class="rp-card-body">
-        <h3 class="h5 fw-bold mb-1">Toplam Ürün</h3>
-        <p class="display-6 m-0">{{ summary.toplam_urun }} <small class="text-muted">adet</small></p>
+      <div class="rp-card-body d-flex align-items-start justify-content-between gap-3">
+        <div>
+          <h3 class="h6 fw-bold text-muted mb-1">Toplam Ürün</h3>
+          <div class="d-flex align-items-end gap-2">
+            <div class="display-6 m-0">{{ summary.toplam_urun }}</div>
+            <small class="text-muted mb-2">adet</small>
+          </div>
+        </div>
+        <div class="rounded-3 p-2" style="background:rgba(37,99,235,.08); border:1px solid rgba(37,99,235,.18);">
+          <span style="font-size:18px;">📦</span>
+        </div>
       </div>
     </div>
   </div>
+
   <div class="col-12 col-md-6">
     <div class="rp-card rp-shadow h-100">
-      <div class="rp-card-body">
-        <h3 class="h5 fw-bold mb-1">Toplam Satış Kaydı</h3>
-        <p class="display-6 m-0">{{ summary.toplam_satis_kaydi }} <small class="text-muted">adet</small></p>
+      <div class="rp-card-body d-flex align-items-start justify-content-between gap-3">
+        <div>
+          <h3 class="h6 fw-bold text-muted mb-1">Toplam Satış Kaydı</h3>
+          <div class="d-flex align-items-end gap-2">
+            <div class="display-6 m-0">{{ summary.toplam_satis_kaydi }}</div>
+            <small class="text-muted mb-2">adet</small>
+          </div>
+        </div>
+        <div class="rounded-3 p-2" style="background:rgba(22,163,74,.10); border:1px solid rgba(22,163,74,.22);">
+          <span style="font-size:18px;">🧾</span>
+        </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ✅ İçgörüler (app.py'den gelen insights) -->
+<div class="rp-card rp-shadow mb-4">
+  <div class="rp-card-body">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h2 class="h5 fw-bold m-0">Bugün Ne Yapmalıyım?</h2>
+      <span class="badge text-bg-primary">Öneriler</span>
+    </div>
+    <p class="text-muted small mb-3">Sistem, son {{ days_window or 30 }} güne göre otomatik aksiyon önerileri çıkarır.</p>
+
+    {% if insights and insights|length %}
+      <div class="d-flex flex-column gap-2">
+        {% for it in insights %}
+          {% set t = (it.type or 'info') %}
+          {% if t == 'danger' %}
+            {% set cls = 'alert-danger' %}
+          {% elif t == 'warning' %}
+            {% set cls = 'alert-warning' %}
+          {% elif t == 'success' %}
+            {% set cls = 'alert-success' %}
+          {% else %}
+            {% set cls = 'alert-info' %}
+          {% endif %}
+
+          <div class="alert {{ cls }} mb-0" role="alert" style="border-radius:14px;">
+            <div class="fw-bold" style="opacity:.92;">{{ it.text }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light mb-0" role="alert">
+        Henüz içgörü üretilecek veri yok. Excel yükleyince öneriler otomatik görünecek.
+      </div>
+    {% endif %}
   </div>
 </div>
 
@@ -43,7 +106,10 @@
             {% for p in best_products %}
               <div class="list-group-item px-0 d-flex align-items-start justify-content-between">
                 <div class="me-3">
-                  <div class="fw-bold">{{ loop.index }}. {{ p.urun_adi }}</div>
+                  <div class="fw-bold">
+                    <span class="me-1" style="color:rgba(22,163,74,.95);">#{{ loop.index }}</span>
+                    {{ p.urun_adi }}
+                  </div>
                   <div class="text-muted small">
                     Adet: {{ p.adet }} · Ciro: {{ "%.2f"|format(p.ciro) }} TL · Kâr: {{ "%.2f"|format(p.kar) }} TL
                   </div>
@@ -78,7 +144,10 @@
             {% for p in worst_products %}
               <div class="list-group-item px-0 d-flex align-items-start justify-content-between">
                 <div class="me-3">
-                  <div class="fw-bold">{{ loop.index }}. {{ p.urun_adi }}</div>
+                  <div class="fw-bold">
+                    <span class="me-1" style="color:rgba(239,68,68,.95);">#{{ loop.index }}</span>
+                    {{ p.urun_adi }}
+                  </div>
                   <div class="text-muted small">
                     Adet: {{ p.adet }} · Ciro: {{ "%.2f"|format(p.ciro) }} TL · Kâr: {{ "%.2f"|format(p.kar) }} TL
                   </div>
@@ -100,10 +169,14 @@
   </div>
 </div>
 
-<!-- Excel yükleme kartı (mevcut) -->
+<!-- Excel yükleme kartı -->
 <div class="rp-card rp-shadow">
   <div class="rp-card-body">
-    <h2 class="h5 fw-bold mb-2">Yeni Satış Raporu Yükle</h2>
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-2">
+      <h2 class="h5 fw-bold mb-0">Yeni Satış Raporu Yükle</h2>
+      <a class="btn btn-dark btn-sm" href="{{ url_for('reports') }}">Analiz Motorlarına Git</a>
+    </div>
+
     <p class="text-muted mb-1">Adisyon sisteminizden aldığınız <code>.xlsx/.xls</code> dosyasını yükleyin.</p>
     <p class="text-muted small mb-4">Gerekli kolonlar: <code>Urun_Adi</code>, <code>Adet</code>, <code>Toplam_Tutar</code>, <code>Tarih</code></p>
 
@@ -113,7 +186,7 @@
     </form>
 
     <div class="text-muted small mt-3">
-      İpucu: Son 7 gün görmek için <code>/dashboard?days=7</code> yazabilirsin.
+      İpucu: Son 7 gün görmek için <code>/dashboard?days=7</code> ya da yukarıdaki filtreleri kullan.
     </div>
   </div>
 </div>
