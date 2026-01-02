@@ -5,59 +5,85 @@
 <div class="container-xxl" style="max-width:1200px;">
   <header class="mb-5">
     <h1 class="fw-bold" style="font-size:32px; line-height:40px;">Menü Yönetimi</h1>
-    <p class="text-muted" style="line-height:1.6;">Ürünler, hammaddeler ve reçeteleri sade bir akışla yönetin.</p>
+    <p class="text-muted" style="line-height:1.6;">Ürünler, hammaddeler ve tarifleri sade bir akışla yönetin.</p>
   </header>
 
   <!-- Hızlı aksiyonlar -->
-  <div class="d-flex flex-wrap gap-2 mb-4">
-    <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalAddMaterial">Hammadde</button>
-    <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modalAddProduct">Ürün</button>
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddRecipe">Reçete</button>
+  <div class="rp-admin-actions d-flex flex-wrap gap-2 mb-4">
+    <button class="btn btn-dark rp-action-btn" data-bs-toggle="modal" data-bs-target="#modalAddMaterial">
+      <span class="rp-action-ic" aria-hidden="true">🧂</span>
+      <span>Hammadde Ekle</span>
+    </button>
+    <button class="btn btn-dark rp-action-btn" data-bs-toggle="modal" data-bs-target="#modalAddProduct">
+      <span class="rp-action-ic" aria-hidden="true">🍔</span>
+      <span>Ürün Ekle</span>
+    </button>
+    <button class="btn btn-success rp-action-btn" data-bs-toggle="modal" data-bs-target="#modalAddRecipe">
+      <span class="rp-action-ic" aria-hidden="true">🧾</span>
+      <span>Tarif Ekle</span>
+    </button>
   </div>
 
   <!-- Özet kutuları -->
   <div class="row g-3 mb-4">
     <div class="col-12 col-md-4">
-      <div class="p-4 bg-white rounded-3 border">
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-muted">Hammadde</span>
-          <span class="badge bg-secondary">{{ hammaddeler|length }}</span>
+      <div class="rp-stat p-4 bg-white rounded-3 border">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="text-muted small mb-1">Hammadde</div>
+            <div class="rp-stat-num">{{ hammaddeler|length }}</div>
+            <div class="rp-stat-label">Kayıtlı hammadde</div>
+          </div>
+          <div class="rp-stat-ic" aria-hidden="true">🧂</div>
         </div>
-        <div class="fw-medium">Kayıtlı hammadde</div>
       </div>
     </div>
+
     <div class="col-12 col-md-4">
-      <div class="p-4 bg-white rounded-3 border">
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-muted">Ürün</span>
-          <span class="badge bg-secondary">{{ urunler|length }}</span>
+      <div class="rp-stat p-4 bg-white rounded-3 border">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="text-muted small mb-1">Ürün</div>
+            <div class="rp-stat-num">{{ urunler|length }}</div>
+            <div class="rp-stat-label">Menüdeki ürün</div>
+          </div>
+          <div class="rp-stat-ic" aria-hidden="true">🍔</div>
         </div>
-        <div class="fw-medium">Menüdeki ürün</div>
       </div>
     </div>
+
     <div class="col-12 col-md-4">
-      <div class="p-4 bg-white rounded-3 border">
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-muted">Reçete</span>
-          <span class="badge bg-secondary">
-            {% if recete_pagination %}{{ recete_pagination.total }}{% else %}{{ receteler|length }}{% endif %}
-          </span>
+      <div class="rp-stat p-4 bg-white rounded-3 border">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="text-muted small mb-1">Tarif</div>
+            <div class="rp-stat-num">
+              {% if recete_pagination %}{{ recete_pagination.total }}{% else %}{{ receteler|length }}{% endif %}
+            </div>
+            <div class="rp-stat-label">Toplam tarif kalemi</div>
+          </div>
+          <div class="rp-stat-ic" aria-hidden="true">🧾</div>
         </div>
-        <div class="fw-medium">Toplam reçete kalemi</div>
       </div>
     </div>
   </div>
 
   <!-- Sekmeler -->
-  <ul class="nav nav-pills mb-3" role="tablist">
+  <ul class="nav nav-pills rp-admin-tabs mb-3" role="tablist">
     <li class="nav-item">
-      <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-mats" type="button">Hammaddeler</button>
+      <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pane-mats" type="button">
+        Hammaddeler
+      </button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-products" type="button">Ürünler</button>
+      <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-products" type="button">
+        Ürünler
+      </button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-recipes" type="button">Reçeteler</button>
+      <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pane-recipes" type="button">
+        Tarifler
+      </button>
     </li>
   </ul>
 
@@ -65,39 +91,46 @@
 
     <!-- Hammaddeler -->
     <section id="pane-mats" class="tab-pane fade show active">
-      <div class="bg-white rounded-3 border">
-        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between p-3 p-md-4 border-bottom">
-          <h3 class="m-0 fw-medium" style="font-size:20px; line-height:24px;">Hammadde Listesi</h3>
-          <input id="filterMats" type="search" class="form-control form-control-sm" placeholder="Ara: isim / birim" style="max-width:320px;">
+      <div class="bg-white rounded-3 border rp-panel">
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between p-3 p-md-4 border-bottom rp-panel-head">
+          <h3 class="m-0 fw-bold" style="font-size:20px; line-height:24px;">Hammadde Listesi</h3>
+
+          <div class="rp-search-wrap" style="max-width:320px; width:100%;">
+            <span class="rp-search-ic" aria-hidden="true">🔍</span>
+            <input id="filterMats" type="search" class="form-control form-control-sm rp-search" placeholder="Ara…" />
+          </div>
         </div>
 
         <div class="table-responsive">
-          <table class="table align-middle mb-0" style="--bs-table-bg:transparent;">
+          <table class="table align-middle mb-0 rp-table" style="--bs-table-bg:transparent;">
             <thead class="table-light">
               <tr>
                 <th>Ad</th>
                 <th style="width:140px;">Birim</th>
                 <th style="width:160px;">Birim Fiyat (TL)</th>
-                <th class="text-end" style="width:130px;">İşlem</th>
+                <th class="text-end" style="width:120px;">İşlem</th>
               </tr>
             </thead>
             <tbody id="matsTbody">
               {% for h in hammaddeler %}
               <tr>
                 <td class="text-truncate">{{ h.isim }}</td>
-                <td>{{ h.maliyet_birimi }}</td>
+                <td class="text-muted">{{ h.maliyet_birimi }}</td>
                 <td>{{ "%.2f"|format(h.maliyet_fiyati) }}</td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-outline-secondary"
-                          data-bs-toggle="modal" data-bs-target="#modalEditMaterial"
-                          data-id="{{ h.id }}" data-isim="{{ h.isim }}"
-                          data-birim="{{ h.maliyet_birimi }}" data-fiyat="{{ h.maliyet_fiyati }}">
-                    Düzenle
-                  </button>
-                  <form action="{{ url_for('delete_material', id=h.id) }}" method="POST" class="d-inline"
-                        onsubmit="return confirm('`{{ h.isim }}` hammaddesini silmek istiyor musunuz?');">
-                    <button class="btn btn-sm btn-outline-danger">Sil</button>
-                  </form>
+                  <div class="rp-row-actions">
+                    <button class="btn btn-sm rp-btn-icon rp-btn-ghost"
+                            title="Düzenle"
+                            data-bs-toggle="modal" data-bs-target="#modalEditMaterial"
+                            data-id="{{ h.id }}" data-isim="{{ h.isim }}"
+                            data-birim="{{ h.maliyet_birimi }}" data-fiyat="{{ h.maliyet_fiyati }}">
+                      ✏️
+                    </button>
+                    <form action="{{ url_for('delete_material', id=h.id) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('`{{ h.isim }}` hammaddesini silmek istiyor musunuz?');">
+                      <button class="btn btn-sm rp-btn-icon rp-btn-danger" title="Sil">🗑️</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {% else %}
@@ -111,14 +144,18 @@
 
     <!-- Ürünler -->
     <section id="pane-products" class="tab-pane fade">
-      <div class="bg-white rounded-3 border">
-        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between p-3 p-md-4 border-bottom">
-          <h3 class="m-0 fw-medium" style="font-size:20px; line-height:24px;">Ürün Listesi</h3>
-          <input id="filterProducts" type="search" class="form-control form-control-sm" placeholder="Ara: isim / excel adı / kategori / grup" style="max-width:380px;">
+      <div class="bg-white rounded-3 border rp-panel">
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between p-3 p-md-4 border-bottom rp-panel-head">
+          <h3 class="m-0 fw-bold" style="font-size:20px; line-height:24px;">Ürün Listesi</h3>
+
+          <div class="rp-search-wrap" style="max-width:420px; width:100%;">
+            <span class="rp-search-ic" aria-hidden="true">🔍</span>
+            <input id="filterProducts" type="search" class="form-control form-control-sm rp-search" placeholder="Ara…" />
+          </div>
         </div>
 
         <div class="table-responsive">
-          <table class="table align-middle mb-0">
+          <table class="table align-middle mb-0 rp-table">
             <thead class="table-light">
               <tr>
                 <th>İsim</th>
@@ -127,7 +164,7 @@
                 <th>Grup</th>
                 <th style="width:120px;">Fiyat</th>
                 <th style="width:120px;">Maliyet</th>
-                <th class="text-end" style="width:130px;">İşlem</th>
+                <th class="text-end" style="width:120px;">İşlem</th>
               </tr>
             </thead>
             <tbody id="productsTbody">
@@ -135,22 +172,25 @@
               <tr>
                 <td class="text-truncate">{{ u.isim }}</td>
                 <td class="text-muted text-truncate">{{ u.excel_adi }}</td>
-                <td>{{ u.kategori }}</td>
-                <td>{{ u.kategori_grubu }}</td>
+                <td class="text-truncate">{{ u.kategori }}</td>
+                <td class="text-truncate">{{ u.kategori_grubu }}</td>
                 <td>{{ "%.2f"|format(u.mevcut_satis_fiyati) }}</td>
                 <td>{{ "%.2f"|format(u.hesaplanan_maliyet) }}</td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-outline-secondary"
-                          data-bs-toggle="modal" data-bs-target="#modalEditProduct"
-                          data-id="{{ u.id }}" data-isim="{{ u.isim }}"
-                          data-excel_adi="{{ u.excel_adi }}" data-fiyat="{{ u.mevcut_satis_fiyati }}"
-                          data-kategori="{{ u.kategori }}" data-grup="{{ u.kategori_grubu }}">
-                    Düzenle
-                  </button>
-                  <form action="{{ url_for('delete_product', id=u.id) }}" method="POST" class="d-inline"
-                        onsubmit="return confirm('`{{ u.isim }}` ürününü silmek istiyor musunuz?');">
-                    <button class="btn btn-sm btn-outline-danger">Sil</button>
-                  </form>
+                  <div class="rp-row-actions">
+                    <button class="btn btn-sm rp-btn-icon rp-btn-ghost"
+                            title="Düzenle"
+                            data-bs-toggle="modal" data-bs-target="#modalEditProduct"
+                            data-id="{{ u.id }}" data-isim="{{ u.isim }}"
+                            data-excel_adi="{{ u.excel_adi }}" data-fiyat="{{ u.mevcut_satis_fiyati }}"
+                            data-kategori="{{ u.kategori }}" data-grup="{{ u.kategori_grubu }}">
+                      ✏️
+                    </button>
+                    <form action="{{ url_for('delete_product', id=u.id) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('`{{ u.isim }}` ürününü silmek istiyor musunuz?');">
+                      <button class="btn btn-sm rp-btn-icon rp-btn-danger" title="Sil">🗑️</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {% else %}
@@ -162,23 +202,27 @@
       </div>
     </section>
 
-    <!-- Reçeteler -->
+    <!-- Tarifler (eski: Reçeteler) -->
     <section id="pane-recipes" class="tab-pane fade">
-      <div class="bg-white rounded-3 border">
-        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between p-3 p-md-4 border-bottom">
-          <h3 class="m-0 fw-medium" style="font-size:20px; line-height:24px;">Reçeteler</h3>
-          <input id="filterRecipes" type="search" class="form-control form-control-sm" placeholder="Ara: ürün / hammadde" style="max-width:320px;">
+      <div class="bg-white rounded-3 border rp-panel">
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between p-3 p-md-4 border-bottom rp-panel-head">
+          <h3 class="m-0 fw-bold" style="font-size:20px; line-height:24px;">Tarifler</h3>
+
+          <div class="rp-search-wrap" style="max-width:320px; width:100%;">
+            <span class="rp-search-ic" aria-hidden="true">🔍</span>
+            <input id="filterRecipes" type="search" class="form-control form-control-sm rp-search" placeholder="Ara…" />
+          </div>
         </div>
 
         <div class="table-responsive">
-          <table class="table align-middle mb-0">
+          <table class="table align-middle mb-0 rp-table">
             <thead class="table-light">
               <tr>
                 <th>Ürün</th>
                 <th>Hammadde</th>
                 <th style="width:140px;">Miktar</th>
                 <th style="width:100px;">Birim</th>
-                <th class="text-end" style="width:130px;">İşlem</th>
+                <th class="text-end" style="width:120px;">İşlem</th>
               </tr>
             </thead>
             <tbody id="recipesTbody">
@@ -187,23 +231,26 @@
                 <td class="text-truncate">{{ r.urun.isim }}</td>
                 <td class="text-truncate">{{ r.hammadde.isim }}</td>
                 <td>{{ r.miktar }}</td>
-                <td>{{ r.hammadde.maliyet_birimi }}</td>
+                <td class="text-muted">{{ r.hammadde.maliyet_birimi }}</td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-outline-secondary"
-                          data-bs-toggle="modal" data-bs-target="#modalEditRecipe"
-                          data-id="{{ r.id }}" data-urun="{{ r.urun.isim }}"
-                          data-hammadde="{{ r.hammadde.isim }}" data-miktar="{{ r.miktar }}"
-                          data-birim="{{ r.hammadde.maliyet_birimi }}">
-                    Düzenle
-                  </button>
-                  <form action="{{ url_for('delete_recipe', id=r.id) }}" method="POST" class="d-inline"
-                        onsubmit="return confirm('Bu reçete kalemini silmek istiyor musunuz?');">
-                    <button class="btn btn-sm btn-outline-danger">Sil</button>
-                  </form>
+                  <div class="rp-row-actions">
+                    <button class="btn btn-sm rp-btn-icon rp-btn-ghost"
+                            title="Düzenle"
+                            data-bs-toggle="modal" data-bs-target="#modalEditRecipe"
+                            data-id="{{ r.id }}" data-urun="{{ r.urun.isim }}"
+                            data-hammadde="{{ r.hammadde.isim }}" data-miktar="{{ r.miktar }}"
+                            data-birim="{{ r.hammadde.maliyet_birimi }}">
+                      ✏️
+                    </button>
+                    <form action="{{ url_for('delete_recipe', id=r.id) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('Bu tarif kalemini silmek istiyor musunuz?');">
+                      <button class="btn btn-sm rp-btn-icon rp-btn-danger" title="Sil">🗑️</button>
+                    </form>
+                  </div>
                 </td>
               </tr>
               {% else %}
-              <tr><td colspan="5" class="text-center text-muted py-4">Reçete kalemi yok.</td></tr>
+              <tr><td colspan="5" class="text-center text-muted py-4">Tarif kalemi yok.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -211,7 +258,7 @@
 
         {% if recete_pagination %}
         <div class="p-3 p-md-4 border-top">
-          <nav aria-label="Reçete Sayfalama">
+          <nav aria-label="Tarif Sayfalama">
             <ul class="pagination pagination-sm mb-0 justify-content-end">
               <li class="page-item {% if not recete_pagination.has_prev %}disabled{% endif %}">
                 <a class="page-link" href="{{ url_for('admin_panel', page=recete_pagination.prev_num, per=recete_pagination.per_page) }}">Önceki</a>
@@ -233,7 +280,7 @@
 
   <!-- Tehlikeli bölge -->
   <section class="mt-5">
-    <div class="p-4 border rounded-3">
+    <div class="p-4 border rounded-3 rp-danger-zone">
       <h3 class="fw-bold mb-3" style="font-size:20px; line-height:24px;">Satış Sil (Tarihe göre)</h3>
       <form action="{{ url_for('delete_sales_by_date') }}" method="POST"
             onsubmit="return confirm('Seçtiğiniz tarihteki TÜM satış kayıtları silinecek. Emin misiniz?');">
@@ -298,9 +345,9 @@
 
   onShow('modalEditRecipe', (m,d) => {
     m.querySelector('form').action = "{{ url_for('edit_recipe', id=0) }}".replace('0', d.id);
-    m.querySelector('#recUrun').textContent      = d.urun || '';
-    m.querySelector('#recHammadde').textContent = d.hammadde || '';
-    m.querySelector('#recBirim').textContent     = d.birim || '';
+    m.querySelector('#recUrun').textContent       = d.urun || '';
+    m.querySelector('#recHammadde').textContent   = d.hammadde || '';
+    m.querySelector('#recBirim').textContent      = d.birim || '';
     m.querySelector('[name=edit_r_miktar]').value = d.miktar || '';
   });
 })();
