@@ -1,6 +1,7 @@
 # app.py — RestoProfit (optimize edilmiş, tutarlı ve güvenli sürüm)
 # NOT: Bu sürümde /add-recipe endpoint'i "çoklu satır" (r_hammadde_id[] / r_miktar[]) destekler.
 # ✅ EK: Dashboard'da son X güne göre en iyi / en kötü 3 ürün (marj) listesi
+# ✅ EK: Dashboard "Bugün Ne Yapmalıyım?" (insights) kartı için öneriler
 
 import os
 import re
@@ -15,7 +16,7 @@ from flask_bcrypt import Bcrypt
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
-from sqlalchemy import func, text, desc, asc
+from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
 
 # --- database.py içe aktarımları ---
@@ -257,60 +258,107 @@ def create_app():
     # -------------------------
     # DASHBOARD HELPERS
     # -------------------------
-    def _top_bottom_products_by_margin(days: int = 30, limit: int = 3):
+    def _product_stats_last_days(days: int = 30):
         """
         Son X gün satışlarına göre ürün bazında:
         - toplam ciro, toplam kâr, toplam adet
         - marj % = (toplam_kâr / toplam_ciro) * 100
-        ve en iyi/en kötü N ürünü döndürür.
         """
         days = max(1, min(int(days or 30), 3650))
         since_dt = datetime.now() - timedelta(days=days)
 
-        ciro_sum = func.coalesce(func.sum(SatisKaydi.toplam_tutar), 0.0).label("ciro")
-        kar_sum = func.coalesce(func.sum(SatisKaydi.hesaplanan_kar), 0.0).label("kar")
-        adet_sum = func.coalesce(func.sum(SatisKaydi.adet), 0).label("adet")
-
-        marj_expr = (
-            (kar_sum / func.nullif(ciro_sum, 0.0)) * 100.0
-        ).label("marj")
-
-        base_q = (
+        rows = (
             db.session.query(
                 Urun.id.label("urun_id"),
                 Urun.isim.label("urun_adi"),
-                ciro_sum,
-                kar_sum,
-                adet_sum,
-                marj_expr
+                func.coalesce(func.sum(SatisKaydi.toplam_tutar), 0.0).label("ciro"),
+                func.coalesce(func.sum(SatisKaydi.hesaplanan_kar), 0.0).label("kar"),
+                func.coalesce(func.sum(SatisKaydi.adet), 0).label("adet"),
+                func.coalesce(func.max(Urun.hesaplanan_maliyet), 0.0).label("urun_maliyet"),
             )
             .join(SatisKaydi, SatisKaydi.urun_id == Urun.id)
             .filter(SatisKaydi.tarih >= since_dt)
             .group_by(Urun.id, Urun.isim)
             .having(func.sum(SatisKaydi.toplam_tutar) > 0)
+            .all()
         )
 
-        best_rows = base_q.order_by(desc(marj_expr), desc(kar_sum)).limit(limit).all()
-        worst_rows = base_q.order_by(asc(marj_expr), asc(kar_sum)).limit(limit).all()
+        out = []
+        for r in rows:
+            ciro = float(r.ciro or 0.0)
+            kar = float(r.kar or 0.0)
+            adet = int(r.adet or 0)
+            marj = (kar / ciro * 100.0) if ciro > 0 else 0.0
+            out.append({
+                "urun_id": int(r.urun_id),
+                "urun_adi": r.urun_adi,
+                "ciro": ciro,
+                "kar": kar,
+                "adet": adet,
+                "marj": float(marj),
+                "urun_maliyet": float(r.urun_maliyet or 0.0),
+            })
+        return out
 
-        def _to_dict(row):
-            return {
-                "urun_id": row.urun_id,
-                "urun_adi": row.urun_adi,
-                "ciro": float(row.ciro or 0.0),
-                "kar": float(row.kar or 0.0),
-                "adet": int(row.adet or 0),
-                "marj": float(row.marj or 0.0),
-            }
+    def _top_bottom_products_by_margin(stats, limit: int = 3):
+        """
+        Hazır stats listesinden en iyi/en kötü ürünleri seçer.
+        Sıralama: marj, sonra kar
+        """
+        limit = max(1, min(int(limit or 3), 20))
+        best = sorted(stats, key=lambda x: (x["marj"], x["kar"]), reverse=True)[:limit]
+        worst = sorted(stats, key=lambda x: (x["marj"], x["kar"]))[:limit]
+        return best, worst
 
-        return [*_map_safe(best_rows, _to_dict)], [*_map_safe(worst_rows, _to_dict)]
+    def _build_insights(stats, days_window: int):
+        """
+        Dashboard için 3-4 adet kısa aksiyon önerisi üretir.
+        """
+        insights = []
+        if not stats:
+            return [{
+                "type": "info",
+                "text": f"Son {days_window} günde satış verisi yok. Excel yüklediğinde burada öneriler çıkacak."
+            }]
 
-    def _map_safe(rows, fn):
-        for r in rows or []:
-            try:
-                yield fn(r)
-            except Exception:
-                continue
+        # 1) Zarar yazan ürün
+        neg = sorted([x for x in stats if x["kar"] < 0], key=lambda x: x["kar"])
+        if neg:
+            x = neg[0]
+            insights.append({
+                "type": "danger",
+                "text": f"❗ {x['urun_adi']} son {days_window} günde zarar yazıyor (Kâr: {x['kar']:.2f} TL). Fiyat veya reçete kontrolü yap."
+            })
+
+        # 2) Düşük marj ama yüksek adet (sessiz kayıp)
+        low_margin = [x for x in stats if x["marj"] < 25 and x["adet"] >= 10]
+        low_margin = sorted(low_margin, key=lambda x: (x["marj"], -x["adet"]))
+        if low_margin:
+            x = low_margin[0]
+            insights.append({
+                "type": "warning",
+                "text": f"⚠️ {x['urun_adi']} çok satıyor ama marj düşük (%{x['marj']:.1f}). Küçük bir fiyat artışı ciddi fark yaratabilir."
+            })
+
+        # 3) En çok kâr getiren ürün
+        top_profit = sorted(stats, key=lambda x: x["kar"], reverse=True)
+        if top_profit and top_profit[0]["kar"] > 0:
+            x = top_profit[0]
+            insights.append({
+                "type": "success",
+                "text": f"✅ {x['urun_adi']} son {days_window} günde en çok kâr getiren ürün (Kâr: {x['kar']:.2f} TL, Marj: %{x['marj']:.1f}). Öne çıkar / stok planla."
+            })
+
+        # 4) Maliyeti 0 görünüp satılan ürün (reçete eksik olabilir)
+        missing_cost = [x for x in stats if (x.get("urun_maliyet", 0.0) <= 0.0)]
+        if missing_cost:
+            x = missing_cost[0]
+            insights.append({
+                "type": "info",
+                "text": f"ℹ️ Satılan bazı ürünlerin maliyeti 0 görünüyor. Reçete/maliyet güncellemesi yap (ör: {x['urun_adi']})."
+            })
+
+        return insights[:4]
 
     # -------------------------
     # DASHBOARD
@@ -319,7 +367,7 @@ def create_app():
     @app.route('/dashboard', endpoint='dashboard')
     @login_required
     def dashboard():
-        # 🔧 İstersen URL'den gün sayısını değiştirebilirsin: /dashboard?days=7
+        # /dashboard?days=7 gibi
         days_window = safe_int(request.args.get("days"), 30)
         if not days_window:
             days_window = 30
@@ -333,13 +381,13 @@ def create_app():
             summary = {'toplam_satis_kaydi': 0, 'toplam_urun': 0}
             flash(f'Veritabanı bağlantı hatası: {e}', 'danger')
 
-        # ✅ En iyi / En kötü 3 ürün
-        best_products, worst_products = [], []
+        best_products, worst_products, insights = [], [], []
         try:
-            best_products, worst_products = _top_bottom_products_by_margin(days=days_window, limit=3)
+            stats = _product_stats_last_days(days_window)
+            best_products, worst_products = _top_bottom_products_by_margin(stats, limit=3)
+            insights = _build_insights(stats, days_window)
         except Exception as e:
-            # Dashboard asla kırılmasın
-            best_products, worst_products = [], []
+            best_products, worst_products, insights = [], [], []
             flash(f"Dashboard ürün analizi hesaplanamadı: {e}", "warning")
 
         return render_template(
@@ -348,6 +396,7 @@ def create_app():
             summary=summary,
             best_products=best_products,
             worst_products=worst_products,
+            insights=insights,
             days_window=days_window
         )
 
